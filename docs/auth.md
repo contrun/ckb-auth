@@ -99,6 +99,14 @@ Key parameters:
 - pubkey: 32 compressed pubkey
 - pubkey hash: blake160 of pubkey
 
+
+#### CardanoLock(algorithm_id=11)
+
+Key parameters:
+- signature: molecule struct (c/cardano/cardano_lock.mol)
+- pubkey: 32 compressed pubkey
+- pubkey hash: blake160 of pubkey
+
 #### More blockchains Support Are Ongoing ...
 - Cardano
 - Litecoin
