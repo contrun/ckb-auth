@@ -12,6 +12,8 @@ use rand::{thread_rng, Rng};
 use sha3::{digest::generic_array::typenum::private::IsEqualPrivate, Digest, Keccak256};
 use std::sync::Arc;
 
+use hex_literal::hex;
+
 use misc::{
     assert_script_error, auth_builder, build_resolved_tx, debug_printer, gen_args, gen_tx,
     gen_tx_with_grouped_args, sign_tx, AlgorithmType, Auth, AuthErrorCodeType, BitcoinAuth,
@@ -292,6 +294,130 @@ fn litecoin_verify_official() {
         return;
     }
     unit_test_common_official(AlgorithmType::Litecoin);
+}
+
+// // Set up an address signature message hash
+// // Hash data: domain separator, spend public key, view public key, mode identifier, payload data
+// static crypto::hash get_message_hash(const std::string &data, const crypto::public_key &spend_key, const crypto::public_key &view_key, const uint8_t mode)
+// {
+//   KECCAK_CTX ctx;
+//   keccak_init(&ctx);
+//   keccak_update(&ctx, (const uint8_t*)config::HASH_KEY_MESSAGE_SIGNING, sizeof(config::HASH_KEY_MESSAGE_SIGNING)); // includes NUL
+//   keccak_update(&ctx, (const uint8_t*)&spend_key, sizeof(crypto::public_key));
+//   keccak_update(&ctx, (const uint8_t*)&view_key, sizeof(crypto::public_key));
+//   keccak_update(&ctx, (const uint8_t*)&mode, sizeof(uint8_t));
+//   char len_buf[(sizeof(size_t) * 8 + 6) / 7];
+//   char *ptr = len_buf;
+//   tools::write_varint(ptr, data.size());
+//   CHECK_AND_ASSERT_THROW_MES(ptr > len_buf && ptr <= len_buf + sizeof(len_buf), "Length overflow");
+//   keccak_update(&ctx, (const uint8_t*)len_buf, ptr - len_buf);
+//   keccak_update(&ctx, (const uint8_t*)data.data(), data.size());
+//   crypto::hash hash;
+//   keccak_finish(&ctx, (uint8_t*)&hash);
+//   return hash;
+// }
+//
+
+fn get_test_key_pair() -> monero::KeyPair {
+    let view_key: [u8; 32] =
+        hex!("972874ae95f5c167285858141e940847398f9c246c7913c0d396b6d73b484105");
+    let view_key = monero::PrivateKey::from_slice(&view_key).unwrap();
+
+    let spend_key: [u8; 32] =
+        hex!("8ef26aced8b5f8e1e8ce63b6c75ac6ee41424242424242424242424242424202");
+    let spend_key = monero::PrivateKey::from_slice(&spend_key).unwrap();
+
+    monero::KeyPair {
+        view: view_key,
+        spend: spend_key,
+    }
+}
+
+fn get_varint(i: usize) -> Vec<u8> {
+    let mut res = Vec::new();
+    let mut i = i;
+    loop {
+        if i < 0x80 {
+            break;
+        }
+        res.push(((i & 0x7f) | 0x80) as u8);
+        i = i >> 7;
+    }
+    res.push(i as u8);
+    res
+}
+
+fn get_message_hash(keypair: &monero::KeyPair, message: &[u8]) -> [u8; 32] {
+    use monero::cryptonote::hash::keccak_256;
+    //   KECCAK_CTX ctx;
+    //   keccak_init(&ctx);
+    //   keccak_update(&ctx, (const uint8_t*)config::HASH_KEY_MESSAGE_SIGNING, sizeof(config::HASH_KEY_MESSAGE_SIGNING)); // includes NUL
+    //   keccak_update(&ctx, (const uint8_t*)&spend_key, sizeof(crypto::public_key));
+    //   keccak_update(&ctx, (const uint8_t*)&view_key, sizeof(crypto::public_key));
+    //   keccak_update(&ctx, (const uint8_t*)&mode, sizeof(uint8_t));
+    //   char len_buf[(sizeof(size_t) * 8 + 6) / 7];
+    //   char *ptr = len_buf;
+    //   tools::write_varint(ptr, data.size());
+    //   CHECK_AND_ASSERT_THROW_MES(ptr > len_buf && ptr <= len_buf + sizeof(len_buf), "Length overflow");
+    //   keccak_update(&ctx, (const uint8_t*)len_buf, ptr - len_buf);
+    //   keccak_update(&ctx, (const uint8_t*)data.data(), data.size());
+    //   crypto::hash hash;
+    //   keccak_finish(&ctx, (uint8_t*)&hash);
+    const HASH_KEY_MESSAGE_SIGNING: &[u8; 23] = b"MoneroMessageSignature\x00";
+    let spend_pubkey = monero::PublicKey::from_private_key(&keypair.spend);
+    let spend_pubkey = spend_pubkey.as_bytes();
+    let view_pubkey = monero::PublicKey::from_private_key(&keypair.view);
+    let view_pubkey = view_pubkey.as_bytes();
+    let mode: [u8; 1] = [0];
+    let varint = get_varint(message.len());
+    let len = HASH_KEY_MESSAGE_SIGNING.len()
+        + spend_pubkey.len()
+        + view_pubkey.len()
+        + 1
+        + varint.len()
+        + message.len();
+    let mut buf = BytesMut::with_capacity(len);
+    buf.put_slice(HASH_KEY_MESSAGE_SIGNING.as_slice());
+    buf.put_slice(spend_pubkey);
+    buf.put_slice(view_pubkey);
+    buf.put_slice(&mode);
+    buf.put_slice(&varint);
+    buf.put_slice(&message);
+
+    let msg = buf.freeze();
+    dbg!(hex::encode(&msg));
+
+    use tiny_keccak::Hasher;
+    use tiny_keccak::Keccak;
+    let mut keccak = Keccak::v256();
+
+    let mut out = [0u8; 32];
+    keccak.update(HASH_KEY_MESSAGE_SIGNING.as_slice());
+    keccak.update(spend_pubkey);
+    keccak.update(view_pubkey);
+    keccak.update(&mode);
+    keccak.update(&varint);
+    keccak.update(&message);
+    keccak.finalize(&mut out);
+
+    dbg!(hex::encode(out));
+    keccak_256(&msg)
+}
+
+#[test]
+fn monero_hash_test() {
+    let message = b"helloworld";
+    let keypair = get_test_key_pair();
+    // [tests/test_auth_demo.rs:388] hex::encode(&msg) = "4d6f6e65726f4d6573736167655369676e617475726500
+    // 007caf7a553a894389dd562115b17e78ba84a5c7692677f216c54385dc5c6ff1
+    // bbcb8c902571ae1a777f7f07a023ecc5e3d83ba624d4b0ffb7eff79e8b5d10bd
+    // 00
+    // 0a
+    // 68656c6c6f776f726c64"
+    // [tests/test_auth_demo.rs:397] hex::encode(&message_hash) = "7c7122c67b25b5fee952ba8b1ee73cfa41e14383f170b04206aeed709a220b60"
+    // test monero_hash_test ... ok
+    let message_hash = get_message_hash(&keypair, message);
+    dbg!(hex::encode(&message_hash));
 }
 
 #[test]

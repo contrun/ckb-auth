@@ -24,6 +24,9 @@ sha2 = "0.10.6"
 mbedtls = "0.8.1"
 bitcoin = "0.30.0"
 base64 = "0.21.0"
+monero = { version = "0.18.2", features = ["serde"] }
+hex-literal = "0.4.1"
+tiny-keccak = "2.0.2"
 
 [dev-dependencies]
 log = { version = "0.4.14", features = ["std"] }
