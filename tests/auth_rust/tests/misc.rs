@@ -366,6 +366,7 @@ pub enum AlgorithmType {
     RSA = 8,
     Iso9796_2 = 9,
     Litecoin = 10,
+    Monero = 12,
     OwnerLock = 0xFC,
 }
 
@@ -604,6 +605,9 @@ pub fn auth_builder(t: AlgorithmType, official: bool) -> result::Result<Box<dyn 
         AlgorithmType::Iso9796_2 => {}
         AlgorithmType::Litecoin => {
             return Ok(LitecoinAuth::new_official(official));
+        }
+        AlgorithmType::Monero => {
+            return Ok(MoneroAuth::new());
         }
         AlgorithmType::OwnerLock => {
             return Ok(OwnerLockAuth::new());
@@ -1118,6 +1122,71 @@ impl LitecoinDaemon {
         let mut command = Command::new(&self.client_executable);
         command.args(&self.common_arguments);
         command
+    }
+}
+
+#[derive(Clone)]
+pub struct MoneroAuth {
+    pub key_pair: monero::KeyPair,
+    pub mode: u8,
+}
+impl MoneroAuth {
+    pub fn new() -> Box<MoneroAuth> {
+        fn get_test_key_pair() -> monero::KeyPair {
+            let view_key: [u8; 32] = hex_literal::hex!(
+                "972874ae95f5c167285858141e940847398f9c246c7913c0d396b6d73b484105"
+            );
+            let view_key = monero::PrivateKey::from_slice(&view_key).unwrap();
+
+            let spend_key: [u8; 32] = hex_literal::hex!(
+                "8ef26aced8b5f8e1e8ce63b6c75ac6ee41424242424242424242424242424202"
+            );
+            let spend_key = monero::PrivateKey::from_slice(&spend_key).unwrap();
+
+            monero::KeyPair {
+                view: view_key,
+                spend: spend_key,
+            }
+        }
+
+        let key_pair = get_test_key_pair();
+        let mode = 0;
+        Box::new(MoneroAuth { key_pair, mode })
+    }
+}
+impl Auth for MoneroAuth {
+    fn get_pub_key_hash(&self) -> Vec<u8> {
+        let spend_pubkey = monero::PublicKey::from_private_key(&self.key_pair.spend);
+        let spend_pubkey = spend_pubkey.as_bytes();
+        Vec::from(&ckb_hash::blake2b_256(spend_pubkey)[..20])
+    }
+    fn get_algorithm_type(&self) -> u8 {
+        AlgorithmType::Monero as u8
+    }
+    fn convert_message(&self, message: &[u8; 32]) -> H256 {
+        H256::from(message.clone())
+    }
+    fn sign(&self, msg: &H256) -> Bytes {
+        let output = 
+            Command::new("sh")
+                .arg("-c")
+                .arg("echo pw | monero-wallet-cli --wallet-file $HOME/Workspace/monero/wallet --password pw sign $HOME/Workspace/monero/message")
+            .output()
+            .unwrap();
+
+        dbg!(std::str::from_utf8(&output.stdout).unwrap_or(&format!("{:?}", &output.stdout)));
+        let signature = std::str::from_utf8(&output.stdout)
+            .unwrap()
+            .lines()
+            .last()
+            .unwrap();
+        assert_eq!(&signature[..5], "SigV2");
+        dbg!(&signature[5..]);
+        let decoded = bs58::decode(&signature[5..])
+            .with_alphabet(bs58::Alphabet::MONERO)
+            .into_vec().unwrap();
+        dbg!(hex::encode(&decoded));
+        decoded.into()
     }
 }
 

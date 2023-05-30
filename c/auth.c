@@ -389,6 +389,9 @@ void get_monero_message_hash(uint8_t hash[MONERO_KECCAK_SIZE], uint8_t *spend_pu
     keccak_update(&ctx, view_pubkey, MONERO_PUBKEY_SIZE);
     keccak_update(&ctx, &mode, sizeof(mode));
 
+    const char TEST_MSG[] = "helloworld";
+    msg = (uint8_t *)TEST_MSG;
+    msg_len = sizeof(TEST_MSG) - 1;
     uint8_t len_buf[(sizeof(size_t) * 8 + 6) / 7];
     uint8_t *ptr = len_buf;
     write_varint(ptr, msg_len);
@@ -424,7 +427,8 @@ int validate_signature_monero(void *prefilled_data, const uint8_t *sig,
     blake2b_state ctx;
     uint8_t pubkey_hash[BLAKE2B_BLOCK_SIZE] = {0};
     blake2b_init(&ctx, BLAKE2B_BLOCK_SIZE);
-    blake2b_update(&ctx, pubkey, MONERO_PUBKEY_SIZE);
+    // TODO: find out the official way of get monero pubkey
+    blake2b_update(&ctx, spend_pubkey, MONERO_PUBKEY_SIZE);
     blake2b_final(&ctx, pubkey_hash, sizeof(pubkey_hash));
 
     memcpy(output, pubkey_hash, BLAKE160_SIZE);

@@ -296,6 +296,11 @@ fn litecoin_verify_official() {
     unit_test_common_official(AlgorithmType::Litecoin);
 }
 
+#[test]
+fn monero_verify() {
+    unit_test_common(AlgorithmType::Monero);
+}
+
 // // Set up an address signature message hash
 // // Hash data: domain separator, spend public key, view public key, mode identifier, payload data
 // static crypto::hash get_message_hash(const std::string &data, const crypto::public_key &spend_key, const crypto::public_key &view_key, const uint8_t mode)
