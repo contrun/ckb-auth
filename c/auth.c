@@ -63,6 +63,10 @@
 #define RIPEMD160_SIZE 20
 #define SCHNORR_SIGNATURE_SIZE (32 + 64)
 #define SCHNORR_PUBKEY_SIZE 32
+#define MONERO_PUBKEY_SIZE 32
+#define MONERO_SIGNATURE_SIZE 64
+#define MONERO_DATA_SIZE (MONERO_SIGNATURE_SIZE + 1 + MONERO_PUBKEY_SIZE*2)
+#define MONERO_KECCAK_SIZE 32
 
 enum AuthErrorCodeType {
     ERROR_NOT_IMPLEMENTED = 100,
@@ -355,6 +359,76 @@ int validate_signature_cardano(void *prefilled_data, const uint8_t *sig,
     blake2b_final(&ctx, pubkey_hash, sizeof(pubkey_hash));
 
     memcpy(output, pubkey_hash, *output_len);
+exit:
+    return err;
+}
+
+// Write size_t integer as a varint to the dest.
+// See https://github.com/monero-project/monero/blob/e06129bb4d1076f4f2cebabddcee09f1e9e30dcc/src/common/varint.h#L64-L79
+void write_varint(uint8_t *dest, size_t i) {
+  /* Make sure that there is one after this */
+  while (i >= 0x80) {
+    *dest = ((uint8_t)(i) & 0x7f) | 0x80; 
+    ++dest;
+    i >>= 7;			/* I should be in multiples of 7, this should just get the next part */
+  }
+  /* writes the last one to dest */
+  *dest = (uint8_t)(i);
+  dest++;			/* Seems kinda pointless... */
+}
+
+// Get monero hash digest from message.
+// See https://github.com/monero-project/monero/blob/e06129bb4d1076f4f2cebabddcee09f1e9e30dcc/src/wallet/wallet2.cpp#L12519-L12538
+void get_monero_message_hash(uint8_t hash[MONERO_KECCAK_SIZE], uint8_t *spend_pubkey, uint8_t *view_pubkey, uint8_t mode, const uint8_t *msg, size_t msg_len) {
+    const char MONERO_HASH_KEY_MESSAGE_SIGNING[] = "MoneroMessageSignature";
+    SHA3_CTX ctx;
+    keccak_init(&ctx);
+
+    keccak_update(&ctx, (uint8_t *)MONERO_HASH_KEY_MESSAGE_SIGNING, sizeof(MONERO_HASH_KEY_MESSAGE_SIGNING)); // includes NUL
+    keccak_update(&ctx, spend_pubkey, MONERO_PUBKEY_SIZE);
+    keccak_update(&ctx, view_pubkey, MONERO_PUBKEY_SIZE);
+    keccak_update(&ctx, &mode, sizeof(mode));
+
+    uint8_t len_buf[(sizeof(size_t) * 8 + 6) / 7];
+    uint8_t *ptr = len_buf;
+    write_varint(ptr, msg_len);
+    keccak_update(&ctx, len_buf, ptr - len_buf);
+
+    keccak_update(&ctx, (uint8_t *)msg, msg_len);
+
+    keccak_final(&ctx, (uint8_t *)hash);
+}
+
+int validate_signature_monero(void *prefilled_data, const uint8_t *sig,
+                               size_t sig_len, const uint8_t *msg,
+                               size_t msg_len, uint8_t *output,
+                               size_t *output_len) {
+    int err = 0;
+
+    CHECK2(msg_len == BLAKE2B_BLOCK_SIZE, ERROR_INVALID_ARG);
+    CHECK2(sig_len == MONERO_DATA_SIZE, ERROR_INVALID_ARG);
+
+    uint8_t *mode_ptr = (uint8_t *)sig + MONERO_SIGNATURE_SIZE;
+    CHECK2(*mode_ptr != 0 || *mode_ptr != 1, ERROR_INVALID_ARG);
+    
+    uint8_t *spend_pubkey = mode_ptr + sizeof(*mode_ptr);
+    uint8_t *view_pubkey = spend_pubkey + MONERO_PUBKEY_SIZE;
+    uint8_t *pubkey = mode_ptr == 0 ? spend_pubkey : view_pubkey;
+
+    uint8_t hash[MONERO_KECCAK_SIZE];
+    get_monero_message_hash(hash, spend_pubkey, view_pubkey, *mode_ptr, msg, msg_len);
+    
+    int suc = ed25519_verify(sig, hash, sizeof(hash), pubkey);
+    CHECK2(suc == 1, ERROR_EXEC_INVALID_SIG);
+
+    blake2b_state ctx;
+    uint8_t pubkey_hash[BLAKE2B_BLOCK_SIZE] = {0};
+    blake2b_init(&ctx, BLAKE2B_BLOCK_SIZE);
+    blake2b_update(&ctx, pubkey, MONERO_PUBKEY_SIZE);
+    blake2b_final(&ctx, pubkey_hash, sizeof(pubkey_hash));
+
+    memcpy(output, pubkey_hash, BLAKE160_SIZE);
+    *output_len = BLAKE160_SIZE;
 exit:
     return err;
 }
@@ -759,6 +833,10 @@ __attribute__((visibility("default"))) int ckb_auth_validate(
     } else if (auth_algorithm_id == AuthAlgorithmIdCardano) {
         err = verify(pubkey_hash, signature, signature_size, message,
                      message_size, validate_signature_cardano, convert_copy);
+        CHECK(err);
+    } else if (auth_algorithm_id == AuthAlgorithmIdMonero) {
+        err = verify(pubkey_hash, signature, signature_size, message,
+                     message_size, validate_signature_monero, convert_copy);
         CHECK(err);
     } else if (auth_algorithm_id == AuthAlgorithmIdOwnerLock) {
         CHECK2(is_lock_script_hash_present(pubkey_hash), ERROR_MISMATCHED);
