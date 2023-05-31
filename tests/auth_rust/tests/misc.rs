@@ -1198,7 +1198,11 @@ impl Auth for MoneroAuth {
         let view_pubkey = view_pubkey.as_bytes();
         data.put(view_pubkey);
         let bytes = data.freeze();
-        dbg!(hex::encode(&bytes));
+        dbg!(
+            hex::encode(&spend_pubkey),
+            hex::encode(&view_pubkey),
+            hex::encode(&bytes)
+        );
         bytes
     }
 }

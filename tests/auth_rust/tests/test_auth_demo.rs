@@ -297,8 +297,16 @@ fn litecoin_verify_official() {
 }
 
 #[test]
-fn monero_verify() {
+fn monero_old_verify() {
     unit_test_common(AlgorithmType::Monero);
+}
+
+#[test]
+fn monero_verify() {
+    let algorithm_type = AlgorithmType::Monero;
+    let auth = auth_builder(algorithm_type, false).unwrap();
+    let run_type = EntryCategoryType::Exec;
+    unit_test_success(&auth, run_type);
 }
 
 // // Set up an address signature message hash

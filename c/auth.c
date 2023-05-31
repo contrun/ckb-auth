@@ -1,3 +1,6 @@
+#define CKB_C_STDLIB_PRINTF
+#include <stdio.h>
+
 // clang-format off
 #include "mbedtls/md.h"
 #include "mbedtls/md_internal.h"
@@ -416,11 +419,12 @@ int validate_signature_monero(void *prefilled_data, const uint8_t *sig,
     
     uint8_t *spend_pubkey = mode_ptr + sizeof(*mode_ptr);
     uint8_t *view_pubkey = spend_pubkey + MONERO_PUBKEY_SIZE;
-    uint8_t *pubkey = mode_ptr == 0 ? spend_pubkey : view_pubkey;
+    uint8_t *pubkey = *mode_ptr == 0 ? spend_pubkey : view_pubkey;
 
     uint8_t hash[MONERO_KECCAK_SIZE];
     get_monero_message_hash(hash, spend_pubkey, view_pubkey, *mode_ptr, msg, msg_len);
     
+    printf("pubkey: %x, hash: %x, spend_pubkey: %x, view_pubkey: %x, mode: %x\n", *pubkey, *hash, *spend_pubkey, *view_pubkey, *mode_ptr);
     int suc = ed25519_verify(sig, hash, sizeof(hash), pubkey);
     CHECK2(suc == 1, ERROR_EXEC_INVALID_SIG);
 
