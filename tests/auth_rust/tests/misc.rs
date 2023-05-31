@@ -1167,8 +1167,7 @@ impl Auth for MoneroAuth {
         H256::from(message.clone())
     }
     fn sign(&self, msg: &H256) -> Bytes {
-        let output = 
-            Command::new("sh")
+        let output = Command::new("sh")
                 .arg("-c")
                 .arg("echo pw | monero-wallet-cli --wallet-file $HOME/Workspace/monero/wallet --password pw sign $HOME/Workspace/monero/message")
             .output()
@@ -1181,12 +1180,26 @@ impl Auth for MoneroAuth {
             .last()
             .unwrap();
         assert_eq!(&signature[..5], "SigV2");
+        let signature = "SigV2JRoqmArq6LecvAKzX18MZTWXyWQZ9z6CsUbBiozzbCJgGj2JRqXReWAeoUVrknjmoLKFcaD93QRA2VVPseHkXdZX";
         dbg!(&signature[5..]);
-        let decoded = bs58::decode(&signature[5..])
-            .with_alphabet(bs58::Alphabet::MONERO)
-            .into_vec().unwrap();
+        // Note: must use base58_monero crate here. The output of other
+        // base58 library is imcompatible to monero's implementation of base58.
+        let decoded = base58_monero::decode(&signature[5..]).unwrap();
         dbg!(hex::encode(&decoded));
-        decoded.into()
+        assert_eq!(decoded.len(), 64);
+
+        let mut data = BytesMut::with_capacity(decoded.len() + 65);
+        data.put(decoded.as_slice());
+        data.put_u8(self.mode);
+        let spend_pubkey = monero::PublicKey::from_private_key(&self.key_pair.spend);
+        let spend_pubkey = spend_pubkey.as_bytes();
+        data.put(spend_pubkey);
+        let view_pubkey = monero::PublicKey::from_private_key(&self.key_pair.view);
+        let view_pubkey = view_pubkey.as_bytes();
+        data.put(view_pubkey);
+        let bytes = data.freeze();
+        dbg!(hex::encode(&bytes));
+        bytes
     }
 }
 

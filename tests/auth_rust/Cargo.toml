@@ -28,6 +28,7 @@ monero = { version = "0.18.2", features = ["serde"] }
 hex-literal = "0.4.1"
 tiny-keccak = "2.0.2"
 bs58 = "0.5.0"
+base58-monero = "1.0.0"
 
 [dev-dependencies]
 log = { version = "0.4.14", features = ["std"] }
