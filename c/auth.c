@@ -380,6 +380,77 @@ void write_varint(uint8_t *dest, size_t i) {
   dest++;			/* Seems kinda pointless... */
 }
 
+// Usage:
+//     hex_dump(desc, addr, len, perLine);
+//         desc:    if non-NULL, printed as a description before hex dump.
+//         addr:    the address to start dumping from.
+//         len:     the number of bytes to dump.
+//         perLine: number of bytes on each output line.
+
+void hex_dump(const char *desc, const void *addr, const int len, int perLine) {
+  // Silently ignore silly per-line values.
+
+  if (perLine < 4 || perLine > 64) perLine = 16;
+
+  int i;
+  unsigned char buff[perLine + 1];
+  const unsigned char *pc = (const unsigned char *)addr;
+
+  // Output description if given.
+
+  if (desc != NULL) printf("%s:\n", desc);
+
+  // Length checks.
+
+  if (len == 0) {
+    printf("  ZERO LENGTH\n");
+    return;
+  }
+  if (len < 0) {
+    printf("  NEGATIVE LENGTH: %d\n", len);
+    return;
+  }
+
+  // Process every byte in the data.
+
+  for (i = 0; i < len; i++) {
+    // Multiple of perLine means new or first line (with line offset).
+
+    if ((i % perLine) == 0) {
+      // Only print previous-line ASCII buffer for lines beyond first.
+
+      if (i != 0) printf("  %s\n", buff);
+
+      // Output the offset of current line.
+
+      printf("  %04x ", i);
+    }
+
+    // Now the hex code for the specific character.
+
+    printf(" %02x", pc[i]);
+
+    // And buffer a printable ASCII character for later.
+
+    if ((pc[i] < 0x20) || (pc[i] > 0x7e))  // isprint() may be better.
+      buff[i % perLine] = '.';
+    else
+      buff[i % perLine] = pc[i];
+    buff[(i % perLine) + 1] = '\0';
+  }
+
+  // Pad out last line if not exactly perLine characters.
+
+  while ((i % perLine) != 0) {
+    printf("   ");
+    i++;
+  }
+
+  // And print the final ASCII buffer.
+
+  printf("  %s\n", buff);
+}
+
 // Get monero hash digest from message.
 // See https://github.com/monero-project/monero/blob/e06129bb4d1076f4f2cebabddcee09f1e9e30dcc/src/wallet/wallet2.cpp#L12519-L12538
 void get_monero_message_hash(uint8_t hash[MONERO_KECCAK_SIZE], uint8_t *spend_pubkey, uint8_t *view_pubkey, uint8_t mode, const uint8_t *msg, size_t msg_len) {
@@ -388,9 +459,13 @@ void get_monero_message_hash(uint8_t hash[MONERO_KECCAK_SIZE], uint8_t *spend_pu
     keccak_init(&ctx);
 
     keccak_update(&ctx, (uint8_t *)MONERO_HASH_KEY_MESSAGE_SIGNING, sizeof(MONERO_HASH_KEY_MESSAGE_SIGNING)); // includes NUL
+    hex_dump("prefix message", (const void *)MONERO_HASH_KEY_MESSAGE_SIGNING, sizeof(MONERO_HASH_KEY_MESSAGE_SIGNING), 0);
     keccak_update(&ctx, spend_pubkey, MONERO_PUBKEY_SIZE);
+    hex_dump("spend_pubkey", (const void *)spend_pubkey, MONERO_PUBKEY_SIZE, 0);
     keccak_update(&ctx, view_pubkey, MONERO_PUBKEY_SIZE);
+    hex_dump("view_pubkey", (const void *)view_pubkey, MONERO_PUBKEY_SIZE, 0);
     keccak_update(&ctx, &mode, sizeof(mode));
+    hex_dump("mode", (const void *)&mode, sizeof(mode), 0);
 
     const char TEST_MSG[] = "helloworld";
     msg = (uint8_t *)TEST_MSG;
@@ -399,8 +474,10 @@ void get_monero_message_hash(uint8_t hash[MONERO_KECCAK_SIZE], uint8_t *spend_pu
     uint8_t *ptr = len_buf;
     write_varint(ptr, msg_len);
     keccak_update(&ctx, len_buf, ptr - len_buf);
+    hex_dump("varint len_buf", (const void *)len_buf, ptr - len_buf, 0);
 
     keccak_update(&ctx, (uint8_t *)msg, msg_len);
+    hex_dump("message", (const void *)msg, msg_len, 0);
 
     keccak_final(&ctx, (uint8_t *)hash);
 }
