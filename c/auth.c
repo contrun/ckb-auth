@@ -368,16 +368,20 @@ exit:
 
 // Write size_t integer as a varint to the dest.
 // See https://github.com/monero-project/monero/blob/e06129bb4d1076f4f2cebabddcee09f1e9e30dcc/src/common/varint.h#L64-L79
-void write_varint(uint8_t *dest, size_t i) {
+size_t write_varint(uint8_t *dest, size_t n) {
+  printf("dest: %p, n: %d\n", dest, n);
+  uint8_t *ptr = dest;
   /* Make sure that there is one after this */
-  while (i >= 0x80) {
-    *dest = ((uint8_t)(i) & 0x7f) | 0x80; 
-    ++dest;
-    i >>= 7;			/* I should be in multiples of 7, this should just get the next part */
+  while (n >= 0x80) {
+    *ptr = ((uint8_t)(n) & 0x7f) | 0x80; 
+    ptr++;
+    n >>= 7;			/* I should be in multiples of 7, this should just get the next part */
   }
   /* writes the last one to dest */
-  *dest = (uint8_t)(i);
-  dest++;			/* Seems kinda pointless... */
+  *ptr = (uint8_t)(n);
+  ptr++;
+  printf("ptr: %p, dest: %p, ptr - dest: %d\n", ptr, dest, ptr - dest);
+  return ptr - dest;
 }
 
 // Usage:
@@ -471,10 +475,9 @@ void get_monero_message_hash(uint8_t hash[MONERO_KECCAK_SIZE], uint8_t *spend_pu
     msg = (uint8_t *)TEST_MSG;
     msg_len = sizeof(TEST_MSG) - 1;
     uint8_t len_buf[(sizeof(size_t) * 8 + 6) / 7];
-    uint8_t *ptr = len_buf;
-    write_varint(ptr, msg_len);
-    keccak_update(&ctx, len_buf, ptr - len_buf);
-    hex_dump("varint len_buf", (const void *)len_buf, ptr - len_buf, 0);
+    size_t written_bytes = write_varint((uint8_t *)len_buf, msg_len);
+    keccak_update(&ctx, (uint8_t *)len_buf, written_bytes);
+    hex_dump("varint len_buf", (const void *)len_buf, written_bytes, 0);
 
     keccak_update(&ctx, (uint8_t *)msg, msg_len);
     hex_dump("message", (const void *)msg, msg_len, 0);
