@@ -70,7 +70,7 @@
 #define SCHNORR_PUBKEY_SIZE 32
 #define MONERO_PUBKEY_SIZE 32
 #define MONERO_SIGNATURE_SIZE 64
-#define MONERO_DATA_SIZE (MONERO_SIGNATURE_SIZE + 1 + MONERO_PUBKEY_SIZE*2)
+#define MONERO_DATA_SIZE (MONERO_SIGNATURE_SIZE + 1 + MONERO_PUBKEY_SIZE * 2)
 #define MONERO_KECCAK_SIZE 32
 
 enum AuthErrorCodeType {
@@ -369,21 +369,23 @@ exit:
 }
 
 // Write size_t integer as a varint to the dest.
-// See https://github.com/monero-project/monero/blob/e06129bb4d1076f4f2cebabddcee09f1e9e30dcc/src/common/varint.h#L64-L79
+// See
+// https://github.com/monero-project/monero/blob/e06129bb4d1076f4f2cebabddcee09f1e9e30dcc/src/common/varint.h#L64-L79
 size_t write_varint(uint8_t *dest, size_t n) {
-  printf("dest: %p, n: %d\n", dest, n);
-  uint8_t *ptr = dest;
-  /* Make sure that there is one after this */
-  while (n >= 0x80) {
-    *ptr = ((uint8_t)(n) & 0x7f) | 0x80; 
+    printf("dest: %p, n: %d\n", dest, n);
+    uint8_t *ptr = dest;
+    /* Make sure that there is one after this */
+    while (n >= 0x80) {
+        *ptr = ((uint8_t)(n)&0x7f) | 0x80;
+        ptr++;
+        n >>= 7; /* I should be in multiples of 7, this should just get the next
+                    part */
+    }
+    /* writes the last one to dest */
+    *ptr = (uint8_t)(n);
     ptr++;
-    n >>= 7;			/* I should be in multiples of 7, this should just get the next part */
-  }
-  /* writes the last one to dest */
-  *ptr = (uint8_t)(n);
-  ptr++;
-  printf("ptr: %p, dest: %p, ptr - dest: %d\n", ptr, dest, ptr - dest);
-  return ptr - dest;
+    printf("ptr: %p, dest: %p, ptr - dest: %d\n", ptr, dest, ptr - dest);
+    return ptr - dest;
 }
 
 // Usage:
@@ -394,78 +396,83 @@ size_t write_varint(uint8_t *dest, size_t n) {
 //         perLine: number of bytes on each output line.
 
 void hex_dump(const char *desc, const void *addr, const int len, int perLine) {
-  // Silently ignore silly per-line values.
+    // Silently ignore silly per-line values.
 
-  if (perLine < 4 || perLine > 64) perLine = 16;
+    if (perLine < 4 || perLine > 64) perLine = 16;
 
-  int i;
-  unsigned char buff[perLine + 1];
-  const unsigned char *pc = (const unsigned char *)addr;
+    int i;
+    unsigned char buff[perLine + 1];
+    const unsigned char *pc = (const unsigned char *)addr;
 
-  // Output description if given.
+    // Output description if given.
 
-  if (desc != NULL) printf("%s:\n", desc);
+    if (desc != NULL) printf("%s:\n", desc);
 
-  // Length checks.
+    // Length checks.
 
-  if (len == 0) {
-    printf("  ZERO LENGTH\n");
-    return;
-  }
-  if (len < 0) {
-    printf("  NEGATIVE LENGTH: %d\n", len);
-    return;
-  }
-
-  // Process every byte in the data.
-
-  for (i = 0; i < len; i++) {
-    // Multiple of perLine means new or first line (with line offset).
-
-    if ((i % perLine) == 0) {
-      // Only print previous-line ASCII buffer for lines beyond first.
-
-      if (i != 0) printf("  %s\n", buff);
-
-      // Output the offset of current line.
-
-      printf("  %04x ", i);
+    if (len == 0) {
+        printf("  ZERO LENGTH\n");
+        return;
+    }
+    if (len < 0) {
+        printf("  NEGATIVE LENGTH: %d\n", len);
+        return;
     }
 
-    // Now the hex code for the specific character.
+    // Process every byte in the data.
 
-    printf(" %02x", pc[i]);
+    for (i = 0; i < len; i++) {
+        // Multiple of perLine means new or first line (with line offset).
 
-    // And buffer a printable ASCII character for later.
+        if ((i % perLine) == 0) {
+            // Only print previous-line ASCII buffer for lines beyond first.
 
-    if ((pc[i] < 0x20) || (pc[i] > 0x7e))  // isprint() may be better.
-      buff[i % perLine] = '.';
-    else
-      buff[i % perLine] = pc[i];
-    buff[(i % perLine) + 1] = '\0';
-  }
+            if (i != 0) printf("  %s\n", buff);
 
-  // Pad out last line if not exactly perLine characters.
+            // Output the offset of current line.
 
-  while ((i % perLine) != 0) {
-    printf("   ");
-    i++;
-  }
+            printf("  %04x ", i);
+        }
 
-  // And print the final ASCII buffer.
+        // Now the hex code for the specific character.
 
-  printf("  %s\n", buff);
+        printf(" %02x", pc[i]);
+
+        // And buffer a printable ASCII character for later.
+
+        if ((pc[i] < 0x20) || (pc[i] > 0x7e))  // isprint() may be better.
+            buff[i % perLine] = '.';
+        else
+            buff[i % perLine] = pc[i];
+        buff[(i % perLine) + 1] = '\0';
+    }
+
+    // Pad out last line if not exactly perLine characters.
+
+    while ((i % perLine) != 0) {
+        printf("   ");
+        i++;
+    }
+
+    // And print the final ASCII buffer.
+
+    printf("  %s\n", buff);
 }
 
 // Get monero hash digest from message.
-// See https://github.com/monero-project/monero/blob/e06129bb4d1076f4f2cebabddcee09f1e9e30dcc/src/wallet/wallet2.cpp#L12519-L12538
-void monero_get_message_hash(uint8_t hash[MONERO_KECCAK_SIZE], uint8_t *spend_pubkey, uint8_t *view_pubkey, uint8_t mode, const uint8_t *msg, size_t msg_len) {
+// See
+// https://github.com/monero-project/monero/blob/e06129bb4d1076f4f2cebabddcee09f1e9e30dcc/src/wallet/wallet2.cpp#L12519-L12538
+void get_monero_message_hash(uint8_t hash[MONERO_KECCAK_SIZE],
+                             uint8_t *spend_pubkey, uint8_t *view_pubkey,
+                             uint8_t mode, const uint8_t *msg, size_t msg_len) {
     const char MONERO_HASH_KEY_MESSAGE_SIGNING[] = "MoneroMessageSignature";
     SHA3_CTX ctx;
     keccak_init(&ctx);
 
-    keccak_update(&ctx, (uint8_t *)MONERO_HASH_KEY_MESSAGE_SIGNING, sizeof(MONERO_HASH_KEY_MESSAGE_SIGNING)); // includes NUL
-    hex_dump("prefix message", (const void *)MONERO_HASH_KEY_MESSAGE_SIGNING, sizeof(MONERO_HASH_KEY_MESSAGE_SIGNING), 0);
+    keccak_update(&ctx, (uint8_t *)MONERO_HASH_KEY_MESSAGE_SIGNING,
+                  sizeof(MONERO_HASH_KEY_MESSAGE_SIGNING));  // includes NUL
+    hex_dump("prefix message", (const void *)MONERO_HASH_KEY_MESSAGE_SIGNING,
+             sizeof(MONERO_HASH_KEY_MESSAGE_SIGNING), 0);
     keccak_update(&ctx, spend_pubkey, MONERO_PUBKEY_SIZE);
     hex_dump("spend_pubkey", (const void *)spend_pubkey, MONERO_PUBKEY_SIZE, 0);
     keccak_update(&ctx, view_pubkey, MONERO_PUBKEY_SIZE);
@@ -487,21 +494,25 @@ void monero_get_message_hash(uint8_t hash[MONERO_KECCAK_SIZE], uint8_t *spend_pu
     keccak_final(&ctx, (uint8_t *)hash);
 }
 
-void monero_hash_to_scalar(uint8_t *msg, size_t msg_len, uint8_t *key, uint8_t *comm, uint8_t scalar[32]) {
-  uint8_t state[200];
-  SHA3_CTX sha3_ctx;
+void monero_hash_to_scalar(uint8_t *msg, size_t msg_len, uint8_t *key,
+                           uint8_t *comm, uint8_t scalar[32]) {
+    uint8_t state[200];
+    SHA3_CTX sha3_ctx;
 
-  keccak_init(&sha3_ctx);
-  keccak_update(&sha3_ctx, msg, msg_len);
-  keccak_update(&sha3_ctx, key, 32);
-  keccak_update(&sha3_ctx, comm, 32);
-  keccak_final(&sha3_ctx, state);
-  memcpy(scalar, &state, 32);
-  sc_reduce(scalar);
+    keccak_init(&sha3_ctx);
+    keccak_update(&sha3_ctx, msg, msg_len);
+    keccak_update(&sha3_ctx, key, 32);
+    keccak_update(&sha3_ctx, comm, 32);
+    keccak_final(&sha3_ctx, state);
+    memcpy(scalar, &state, 32);
+    sc_reduce(scalar);
 }
 
-// See https://github.com/monero-project/monero/blob/e06129bb4d1076f4f2cebabddcee09f1e9e30dcc/src/crypto/crypto.cpp#L319-L341
-int ed25519_verify_monero(const unsigned char *signature, const unsigned char *message, size_t message_len, const unsigned char *public_key) {
+// See
+// https://github.com/monero-project/monero/blob/e06129bb4d1076f4f2cebabddcee09f1e9e30dcc/src/crypto/crypto.cpp#L319-L341
+int ed25519_verify_monero(const unsigned char *signature,
+                          const unsigned char *message, size_t message_len,
+                          const unsigned char *public_key) {
     ge_p2 tmp2;
     ge_p3 tmp3;
     uint8_t c[32];
@@ -514,35 +525,37 @@ int ed25519_verify_monero(const unsigned char *signature, const unsigned char *m
     hex_dump("sig_c", sig_c, sizeof(sig_c), 0);
     hex_dump("sig_r", sig_r, sizeof(sig_r), 0);
     if (sc_check(sig_c) != 0 || sc_check(sig_r) != 0 || !sc_isnonzero(sig_c)) {
-      return 0;
+        return 0;
     }
-    // TODO: implement ge_frombytes_vartime instead of using ge_frombytes_negate_vartime
-    // and then multiple the result with a negative scalar
+    // TODO: implement ge_frombytes_vartime instead of using
+    // ge_frombytes_negate_vartime and then multiple the result with a negative
+    // scalar
     sc_0(zero);
     sc_sub(sig_c_neg, zero, sig_c);
     hex_dump("sig_c_neg", sig_c_neg, sizeof(sig_c_neg), 0);
     if (ge_frombytes_negate_vartime(&tmp3, public_key) != 0) {
-      return 0;
+        return 0;
     }
     ge_double_scalarmult_vartime(&tmp2, sig_c_neg, &tmp3, sig_r);
     ge_tobytes(comm, &tmp2);
     hex_dump("comm", comm, sizeof(comm), 0);
 
-    static const uint8_t infinity[32] = { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    if (memcmp(&comm, &infinity, 32) == 0)
-      return 0;
-    monero_hash_to_scalar((uint8_t *)message, message_len, (uint8_t *)public_key, comm, c);
+    static const uint8_t infinity[32] = {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    if (memcmp(&comm, &infinity, 32) == 0) return 0;
+    monero_hash_to_scalar((uint8_t *)message, message_len,
+                          (uint8_t *)public_key, comm, c);
     sc_sub(c, c, sig_c);
     hex_dump("c", c, sizeof(c), 0);
     hex_dump("sig_c", sig_c, sizeof(sig_c), 0);
     return sc_isnonzero((const uint8_t *)c) != 0;
 }
 
-
 int validate_signature_monero(void *prefilled_data, const uint8_t *sig,
-                               size_t sig_len, const uint8_t *msg,
-                               size_t msg_len, uint8_t *output,
-                               size_t *output_len) {
+                              size_t sig_len, const uint8_t *msg,
+                              size_t msg_len, uint8_t *output,
+                              size_t *output_len) {
     int err = 0;
 
     CHECK2(msg_len == BLAKE2B_BLOCK_SIZE, ERROR_INVALID_ARG);
@@ -550,14 +563,15 @@ int validate_signature_monero(void *prefilled_data, const uint8_t *sig,
 
     uint8_t *mode_ptr = (uint8_t *)sig + MONERO_SIGNATURE_SIZE;
     CHECK2(*mode_ptr != 0 || *mode_ptr != 1, ERROR_INVALID_ARG);
-    
+
     uint8_t *spend_pubkey = mode_ptr + sizeof(*mode_ptr);
     uint8_t *view_pubkey = spend_pubkey + MONERO_PUBKEY_SIZE;
     uint8_t *pubkey = *mode_ptr == 0 ? spend_pubkey : view_pubkey;
 
     uint8_t hash[MONERO_KECCAK_SIZE];
-    monero_get_message_hash(hash, spend_pubkey, view_pubkey, *mode_ptr, msg, msg_len);
-    
+    get_monero_message_hash(hash, spend_pubkey, view_pubkey, *mode_ptr, msg,
+                            msg_len);
+
     hex_dump("hash", (const void *)hash, sizeof(hash), 0);
     hex_dump("sig", (const void *)sig, MONERO_SIGNATURE_SIZE, 0);
     hex_dump("pubkey", (const void *)pubkey, MONERO_PUBKEY_SIZE, 0);
