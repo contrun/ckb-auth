@@ -340,10 +340,13 @@ fn get_test_key_pair() -> monero::KeyPair {
         hex!("8ef26aced8b5f8e1e8ce63b6c75ac6ee41424242424242424242424242424202");
     let spend_key = monero::PrivateKey::from_slice(&spend_key).unwrap();
 
-    monero::KeyPair {
+    let keypair = monero::KeyPair {
         view: view_key,
         spend: spend_key,
-    }
+    };
+    let address = monero::Address::from_keypair(monero::Network::Mainnet, &keypair);
+    dbg!(address);
+    keypair
 }
 
 fn get_varint(i: usize) -> Vec<u8> {

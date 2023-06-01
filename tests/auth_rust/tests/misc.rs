@@ -1143,10 +1143,13 @@ impl MoneroAuth {
             );
             let spend_key = monero::PrivateKey::from_slice(&spend_key).unwrap();
 
-            monero::KeyPair {
+            let keypair = monero::KeyPair {
                 view: view_key,
                 spend: spend_key,
-            }
+            };
+            let address = monero::Address::from_keypair(monero::Network::Mainnet, &keypair);
+            dbg!(address, address.to_string());
+            keypair
         }
 
         let key_pair = get_test_key_pair();
@@ -1167,21 +1170,32 @@ impl Auth for MoneroAuth {
         H256::from(message.clone())
     }
     fn sign(&self, msg: &H256) -> Bytes {
-        let output = Command::new("sh")
-                .arg("-c")
-                .arg("echo pw | monero-wallet-cli --wallet-file $HOME/Workspace/monero/wallet --password pw sign $HOME/Workspace/monero/message")
-            .output()
-            .unwrap();
+        let address =
+            monero::Address::from_keypair(monero::Network::Mainnet, &self.key_pair).to_string();
+        let spend_key = hex::encode(self.key_pair.spend.to_bytes());
+        let view_key = hex::encode(self.key_pair.view.to_bytes());
+        let password = "pw";
+        let stdin = format!(
+            "{}\n{}\n{}\n{}\n{}\n0\nN\n",
+            address, spend_key, view_key, password, password,
+        );
+        let wallet_file_name = "ckb-auth-test-wallet";
+        let message_file_name = "ckb-auth-test-message";
+        let message_hex = hex::encode(msg.as_bytes());
+        let command = format!(
+            r###"rm -f {wallet_file_name}*; rm -f {message_file_name}; trap '(rm -f {wallet_file_name}*; rm -f {message_file_name})' EXIT INT TERM; printf '{stdin}' | monero-wallet-cli --offline --generate-from-keys {wallet_file_name}; printf {message_hex} > {message_file_name}; echo '{password}' | monero-wallet-cli --offline --wallet-file {wallet_file_name} --password {password} sign {message_file_name}"###
+        );
+        dbg!(&command);
 
-        dbg!(std::str::from_utf8(&output.stdout).unwrap_or(&format!("{:?}", &output.stdout)));
+        let output = Command::new("sh").arg("-c").arg(command).output().unwrap();
+
+        println!("{}", std::str::from_utf8(&output.stdout).unwrap_or(&format!("{:?}", &output.stdout)));
         let signature = std::str::from_utf8(&output.stdout)
             .unwrap()
             .lines()
             .last()
             .unwrap();
         assert_eq!(&signature[..5], "SigV2");
-        let signature = "SigV2JRoqmArq6LecvAKzX18MZTWXyWQZ9z6CsUbBiozzbCJgGj2JRqXReWAeoUVrknjmoLKFcaD93QRA2VVPseHkXdZX";
-        dbg!(&signature[5..]);
         // Note: must use base58_monero crate here. The output of other
         // base58 library is imcompatible to monero's implementation of base58.
         let decoded = base58_monero::decode(&signature[5..]).unwrap();

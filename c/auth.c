@@ -6,6 +6,8 @@
 #include "mbedtls/md_internal.h"
 #include "mbedtls/memory_buffer_alloc.h"
 #include "ed25519.h"
+#include "ge.h"
+#include "sc.h"
 
 // configuration for secp256k1
 #define ENABLE_MODULE_EXTRAKEYS
@@ -457,7 +459,7 @@ void hex_dump(const char *desc, const void *addr, const int len, int perLine) {
 
 // Get monero hash digest from message.
 // See https://github.com/monero-project/monero/blob/e06129bb4d1076f4f2cebabddcee09f1e9e30dcc/src/wallet/wallet2.cpp#L12519-L12538
-void get_monero_message_hash(uint8_t hash[MONERO_KECCAK_SIZE], uint8_t *spend_pubkey, uint8_t *view_pubkey, uint8_t mode, const uint8_t *msg, size_t msg_len) {
+void monero_get_message_hash(uint8_t hash[MONERO_KECCAK_SIZE], uint8_t *spend_pubkey, uint8_t *view_pubkey, uint8_t mode, const uint8_t *msg, size_t msg_len) {
     const char MONERO_HASH_KEY_MESSAGE_SIGNING[] = "MoneroMessageSignature";
     SHA3_CTX ctx;
     keccak_init(&ctx);
@@ -485,6 +487,58 @@ void get_monero_message_hash(uint8_t hash[MONERO_KECCAK_SIZE], uint8_t *spend_pu
     keccak_final(&ctx, (uint8_t *)hash);
 }
 
+void monero_hash_to_scalar(uint8_t *msg, size_t msg_len, uint8_t *key, uint8_t *comm, uint8_t scalar[32]) {
+  uint8_t state[200];
+  SHA3_CTX sha3_ctx;
+
+  keccak_init(&sha3_ctx);
+  keccak_update(&sha3_ctx, msg, msg_len);
+  keccak_update(&sha3_ctx, key, 32);
+  keccak_update(&sha3_ctx, comm, 32);
+  keccak_final(&sha3_ctx, state);
+  memcpy(scalar, &state, 32);
+  sc_reduce(scalar);
+}
+
+// See https://github.com/monero-project/monero/blob/e06129bb4d1076f4f2cebabddcee09f1e9e30dcc/src/crypto/crypto.cpp#L319-L341
+int ed25519_verify_monero(const unsigned char *signature, const unsigned char *message, size_t message_len, const unsigned char *public_key) {
+    ge_p2 tmp2;
+    ge_p3 tmp3;
+    uint8_t c[32];
+    uint8_t comm[32];
+    uint8_t *sig_c = (uint8_t *)signature;
+    uint8_t *sig_r = sig_c + 32;
+    uint8_t zero[32];
+    uint8_t sig_c_neg[32];
+
+    hex_dump("sig_c", sig_c, sizeof(sig_c), 0);
+    hex_dump("sig_r", sig_r, sizeof(sig_r), 0);
+    if (sc_check(sig_c) != 0 || sc_check(sig_r) != 0 || !sc_isnonzero(sig_c)) {
+      return 0;
+    }
+    // TODO: implement ge_frombytes_vartime instead of using ge_frombytes_negate_vartime
+    // and then multiple the result with a negative scalar
+    sc_0(zero);
+    sc_sub(sig_c_neg, zero, sig_c);
+    hex_dump("sig_c_neg", sig_c_neg, sizeof(sig_c_neg), 0);
+    if (ge_frombytes_negate_vartime(&tmp3, public_key) != 0) {
+      return 0;
+    }
+    ge_double_scalarmult_vartime(&tmp2, sig_c_neg, &tmp3, sig_r);
+    ge_tobytes(comm, &tmp2);
+    hex_dump("comm", comm, sizeof(comm), 0);
+
+    static const uint8_t infinity[32] = { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    if (memcmp(&comm, &infinity, 32) == 0)
+      return 0;
+    monero_hash_to_scalar((uint8_t *)message, message_len, (uint8_t *)public_key, comm, c);
+    sc_sub(c, c, sig_c);
+    hex_dump("c", c, sizeof(c), 0);
+    hex_dump("sig_c", sig_c, sizeof(sig_c), 0);
+    return sc_isnonzero((const uint8_t *)c) != 0;
+}
+
+
 int validate_signature_monero(void *prefilled_data, const uint8_t *sig,
                                size_t sig_len, const uint8_t *msg,
                                size_t msg_len, uint8_t *output,
@@ -502,10 +556,13 @@ int validate_signature_monero(void *prefilled_data, const uint8_t *sig,
     uint8_t *pubkey = *mode_ptr == 0 ? spend_pubkey : view_pubkey;
 
     uint8_t hash[MONERO_KECCAK_SIZE];
-    get_monero_message_hash(hash, spend_pubkey, view_pubkey, *mode_ptr, msg, msg_len);
+    monero_get_message_hash(hash, spend_pubkey, view_pubkey, *mode_ptr, msg, msg_len);
     
-    printf("pubkey: %x, hash: %x, spend_pubkey: %x, view_pubkey: %x, mode: %x\n", *pubkey, *hash, *spend_pubkey, *view_pubkey, *mode_ptr);
-    int suc = ed25519_verify(sig, hash, sizeof(hash), pubkey);
+    hex_dump("hash", (const void *)hash, sizeof(hash), 0);
+    hex_dump("sig", (const void *)sig, MONERO_SIGNATURE_SIZE, 0);
+    hex_dump("pubkey", (const void *)pubkey, MONERO_PUBKEY_SIZE, 0);
+    int suc = ed25519_verify_monero(sig, hash, sizeof(hash), pubkey);
+    printf("return code: %d\n", suc);
     CHECK2(suc == 1, ERROR_EXEC_INVALID_SIG);
 
     blake2b_state ctx;
