@@ -505,7 +505,9 @@ void monero_hash_to_scalar(uint8_t *msg, size_t msg_len, uint8_t *key,
     keccak_update(&sha3_ctx, comm, 32);
     keccak_final(&sha3_ctx, state);
     memcpy(scalar, &state, 32);
-    sc_reduce(scalar);
+    hex_dump("hash_to_scalar before reduce", scalar, 32, 0);
+    sc_reduce32(scalar);
+    hex_dump("hash_to_scalar after reduce", scalar, 32, 0);
 }
 
 // See
@@ -522,8 +524,8 @@ int ed25519_verify_monero(const unsigned char *signature,
     uint8_t zero[32];
     uint8_t sig_c_neg[32];
 
-    hex_dump("sig_c", sig_c, sizeof(sig_c), 0);
-    hex_dump("sig_r", sig_r, sizeof(sig_r), 0);
+    hex_dump("sig_c", sig_c, 32, 0);
+    hex_dump("sig_r", sig_r, 32, 0);
     if (sc_check(sig_c) != 0 || sc_check(sig_r) != 0 || !sc_isnonzero(sig_c)) {
         return 0;
     }
@@ -546,10 +548,12 @@ int ed25519_verify_monero(const unsigned char *signature,
     if (memcmp(&comm, &infinity, 32) == 0) return 0;
     monero_hash_to_scalar((uint8_t *)message, message_len,
                           (uint8_t *)public_key, comm, c);
+    hex_dump("hash to scalar c", c, sizeof(c), 0);
+    hex_dump("sig_c", sig_c, 32, 0);
     sc_sub(c, c, sig_c);
-    hex_dump("c", c, sizeof(c), 0);
-    hex_dump("sig_c", sig_c, sizeof(sig_c), 0);
-    return sc_isnonzero((const uint8_t *)c) != 0;
+    hex_dump("final result c", c, sizeof(c), 0);
+    printf("final result is non zero %d\n", sc_isnonzero((const uint8_t *)c));
+    return sc_isnonzero((const uint8_t *)c) == 0;
 }
 
 int validate_signature_monero(void *prefilled_data, const uint8_t *sig,
@@ -557,6 +561,9 @@ int validate_signature_monero(void *prefilled_data, const uint8_t *sig,
                               size_t msg_len, uint8_t *output,
                               size_t *output_len) {
     int err = 0;
+
+    hex_dump("sig", (const void *)sig, sig_len, 0);
+    hex_dump("msg", (const void *)msg, msg_len, 0);
 
     CHECK2(msg_len == BLAKE2B_BLOCK_SIZE, ERROR_INVALID_ARG);
     CHECK2(sig_len == MONERO_DATA_SIZE, ERROR_INVALID_ARG);
@@ -573,7 +580,6 @@ int validate_signature_monero(void *prefilled_data, const uint8_t *sig,
                             msg_len);
 
     hex_dump("hash", (const void *)hash, sizeof(hash), 0);
-    hex_dump("sig", (const void *)sig, MONERO_SIGNATURE_SIZE, 0);
     hex_dump("pubkey", (const void *)pubkey, MONERO_PUBKEY_SIZE, 0);
     int suc = ed25519_verify_monero(sig, hash, sizeof(hash), pubkey);
     printf("return code: %d\n", suc);
@@ -597,6 +603,7 @@ int convert_copy(const uint8_t *msg, size_t msg_len, uint8_t *new_msg,
     if (msg_len != new_msg_len || msg_len != BLAKE2B_BLOCK_SIZE)
         return ERROR_INVALID_ARG;
     memcpy(new_msg, msg, msg_len);
+    hex_dump("converting message", (const void *)msg, msg_len, 0);
     return 0;
 }
 
@@ -994,6 +1001,7 @@ __attribute__((visibility("default"))) int ckb_auth_validate(
                      message_size, validate_signature_cardano, convert_copy);
         CHECK(err);
     } else if (auth_algorithm_id == AuthAlgorithmIdMonero) {
+        hex_dump("message before verify", message, message_size, 0);
         err = verify(pubkey_hash, signature, signature_size, message,
                      message_size, validate_signature_monero, convert_copy);
         CHECK(err);
@@ -1142,6 +1150,8 @@ int main(int argc, char *argv[]) {
         err = ckb_exec_decode_params(next, &param_ptr, &param_len, &next);
         CHECK(err);
 
+        printf("param_index: %d\n", param_index);
+        hex_dump("parameter", param_ptr, param_len, 0);
         if (param_index == 0) {
             // code hash
             CHECK2(param_len == 32, ERROR_EXEC_INVALID_LENGTH);
@@ -1171,6 +1181,7 @@ int main(int argc, char *argv[]) {
             entries[entry_index].msg = param_ptr;
             entries[entry_index].msg_len = param_len;
             entries[entry_index].has_msg = true;
+            hex_dump("message in decoding", param_ptr, param_len, 0);
         } else if ((param_index - 2) % 4 == 3) {
             // pubkey hash
             CHECK2(param_len > 0, ERROR_EXEC_INVALID_LENGTH);
@@ -1196,6 +1207,7 @@ int main(int argc, char *argv[]) {
         CHECK2(entry->has_msg, ERROR_EXEC_INVALID_PARAM);
         CHECK2(entry->has_sig, ERROR_EXEC_INVALID_PARAM);
         CHECK2(entry->has_pubkey, ERROR_EXEC_INVALID_PARAM);
+        hex_dump("message before ckb_auth_validate", entry->msg, entry->msg_len, 0);
         err = ckb_auth_validate(entry->auth_algorithm_id, entry->sig,
                                 entry->sig_len, entry->msg, entry->msg_len,
                                 entry->pubkey_hash, entry->pubkey_hash_len);
