@@ -16,8 +16,14 @@ jobs:
       run: |
         tarball=litecoin.tar.gz
         wget -O "$tarball" https://download.litecoin.org/litecoin-0.21.2.2/linux/litecoin-0.21.2.2-x86_64-linux-gnu.tar.gz
-        tar xvzf "$tarball"
+        tar xvaf "$tarball"
         sudo rsync -avz --progress -h --remove-source-files litecoin-*/ /usr/local
+    - name: Install monero wallet cli for tests
+      run: |
+        tarball=monero-wallet-cli.tar.gz
+        wget -O "$tarball" https://downloads.getmonero.org/cli/monero-linux-x64-v0.18.2.2.tar.bz2
+        tar xvaf "$tarball"
+        sudo rsync -avz --progress -h --remove-source-files monero-*/ /usr/local
     - name: Build contract
       run: make all-via-docker
     - name: Run auth_rust tests

@@ -298,11 +298,17 @@ fn litecoin_verify_official() {
 
 #[test]
 fn monero_old_verify() {
+    if which::which("monero-wallet-cli").is_err() {
+        return;
+    }
     unit_test_common(AlgorithmType::Monero);
 }
 
 #[test]
 fn monero_verify() {
+    if which::which("monero-wallet-cli").is_err() {
+        return;
+    }
     let algorithm_type = AlgorithmType::Monero;
     let auth = auth_builder(algorithm_type, false).unwrap();
     let run_type = EntryCategoryType::Exec;
