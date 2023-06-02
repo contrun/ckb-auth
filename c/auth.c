@@ -1145,6 +1145,7 @@ int main(int argc, char *argv[]) {
         // if next is NULL, in last iterator, it encounters \0.
         // when error is returned, there must be an error in call
         if (next == NULL) break;
+        printf("decoding args: %s\n", next);
         err = ckb_exec_decode_params(next, &param_ptr, &param_len, &next);
         CHECK(err);
 

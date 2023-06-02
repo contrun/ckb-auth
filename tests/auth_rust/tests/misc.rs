@@ -1227,6 +1227,10 @@ impl Auth for MoneroAuth {
         dbg!(hex::encode(&bytes));
         bytes
     }
+    fn get_sign_size(&self) -> usize {
+        // #define MONERO_DATA_SIZE (MONERO_SIGNATURE_SIZE + 1 + MONERO_PUBKEY_SIZE * 2)
+        64 + 1 + 32 * 2
+    }
 }
 
 #[derive(Clone)]
