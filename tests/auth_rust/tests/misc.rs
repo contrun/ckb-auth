@@ -148,9 +148,11 @@ pub fn sign_tx_by_input_group(
                     blake2b.update(&witness.raw_data());
                 });
                 blake2b.finalize(&mut message);
+                dbg!(hex::encode(message));
                 if config.incorrect_msg {
                     rng.fill(&mut message);
                 }
+                dbg!(hex::encode(message));
                 let sig;
                 if config.incorrect_sign {
                     sig = {
@@ -158,6 +160,7 @@ pub fn sign_tx_by_input_group(
                         Bytes::from(buff)
                     };
                 } else {
+                    dbg!(hex::encode(message));
                     let converted_message = config.auth.convert_message(&message);
                     sig = config.auth.sign(&converted_message)
                 }
@@ -334,13 +337,13 @@ pub fn gen_tx_with_grouped_args<R: Rng>(
     tx_builder.build()
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct CkbAuthType {
     algorithm_id: u8,
     content: [u8; 20],
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct EntryType {
     code_hash: [u8; 32],
     hash_type: u8,
@@ -442,6 +445,12 @@ pub fn gen_args(config: &TestConfig) -> Bytes {
         .copy_from_slice(sighash_all_cell_data_hash.as_slice());
 
     let mut bytes = BytesMut::with_capacity(size_of::<CkbAuthType>() + size_of::<EntryType>());
+    dbg!(
+        &ckb_auth_type,
+        hex::encode(bincode::serialize(&ckb_auth_type).unwrap()),
+        &entry_type,
+        hex::encode(bincode::serialize(&entry_type).unwrap()),
+    );
     bytes.put(Bytes::from(bincode::serialize(&ckb_auth_type).unwrap()));
     bytes.put(Bytes::from(bincode::serialize(&entry_type).unwrap()));
 
@@ -1172,7 +1181,6 @@ impl Auth for MoneroAuth {
     fn sign(&self, msg: &H256) -> Bytes {
         let message_hex = hex::encode(msg.as_bytes());
         dbg!(&message_hex);
-        let message_hex = "helloworld";
 
         let address =
             monero::Address::from_keypair(monero::Network::Mainnet, &self.key_pair).to_string();
@@ -1492,5 +1500,3 @@ impl Auth for OwnerLockAuth {
         Bytes::from([0; 64].to_vec())
     }
 }
-
-

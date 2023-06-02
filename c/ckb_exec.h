@@ -167,6 +167,7 @@ int ckb_exec_encode_params(CkbBinaryArgsType* in, CkbHexArgsType* out) {
 
 int ckb_exec_decode_params(char* argv, uint8_t** param_ptr, uint32_t* param_len,
                            char** next_iterator_argv) {
+    printf("%s argv: %s\n", __func__, argv);
     int err = 0;
     *param_len = 0;
     *param_ptr = NULL;

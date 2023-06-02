@@ -480,9 +480,6 @@ void get_monero_message_hash(uint8_t hash[MONERO_KECCAK_SIZE],
     keccak_update(&ctx, &mode, sizeof(mode));
     hex_dump("mode", (const void *)&mode, sizeof(mode), 0);
 
-    const char TEST_MSG[] = "helloworld";
-    msg = (uint8_t *)TEST_MSG;
-    msg_len = sizeof(TEST_MSG) - 1;
     uint8_t len_buf[(sizeof(size_t) * 8 + 6) / 7];
     size_t written_bytes = write_varint((uint8_t *)len_buf, msg_len);
     keccak_update(&ctx, (uint8_t *)len_buf, written_bytes);
@@ -948,6 +945,7 @@ __attribute__((visibility("default"))) int ckb_auth_validate(
     uint8_t auth_algorithm_id, const uint8_t *signature,
     uint32_t signature_size, const uint8_t *message, uint32_t message_size,
     uint8_t *pubkey_hash, uint32_t pubkey_hash_size) {
+    hex_dump("message in ckb_auth_validate", message, message_size, 0);
     int err = 0;
     CHECK2(signature != NULL, ERROR_INVALID_ARG);
     CHECK2(message != NULL, ERROR_INVALID_ARG);
