@@ -1195,7 +1195,7 @@ impl Auth for MoneroAuth {
         let wallet_file_name = "ckb-auth-test-wallet";
         let message_file_name = "ckb-auth-test-message";
         let command = format!(
-            r###"rm -f {wallet_file_name}*; rm -f {message_file_name}; trap '(rm -f {wallet_file_name}*; rm -f {message_file_name})' EXIT INT TERM; printf '{stdin_to_create_wallet}' | monero-wallet-cli --offline --generate-from-keys {wallet_file_name}; printf {message_hex} > {message_file_name}; echo '{password}' | monero-wallet-cli --offline --wallet-file {wallet_file_name} --password {password} sign {message_file_name}"###
+            r###"rm -f {wallet_file_name}*; rm -f {message_file_name}; trap '(rm -f {wallet_file_name}*; rm -f {message_file_name})' EXIT INT TERM; printf '{stdin_to_create_wallet}' | monero-wallet-cli --offline --generate-from-keys {wallet_file_name}; printf '%b' $(printf {message_hex} | fold -b2 | sed 's#^#\\x#') > {message_file_name}; echo '{password}' | monero-wallet-cli --offline --wallet-file {wallet_file_name} --password {password} sign {message_file_name}"###
         );
         let output = Command::new("sh").arg("-c").arg(&command).output().unwrap();
         dbg!(
@@ -1208,11 +1208,11 @@ impl Auth for MoneroAuth {
             .last()
             .unwrap();
         assert_eq!(&signature[..5], "SigV2");
-        let signature = "SigV2JRoqmArq6LecvAKzX18MZTWXyWQZ9z6CsUbBiozzbCJgGj2JRqXReWAeoUVrknjmoLKFcaD93QRA2VVPseHkXdZX";
         // Note: must use base58_monero crate here. The output of other
         // base58 library is imcompatible to monero's implementation of base58.
         let decoded = base58_monero::decode(&signature[5..]).unwrap();
         assert_eq!(decoded.len(), 64);
+        dbg!(hex::encode(&decoded));
 
         let mut data = BytesMut::with_capacity(decoded.len() + 65);
         data.put(decoded.as_slice());
