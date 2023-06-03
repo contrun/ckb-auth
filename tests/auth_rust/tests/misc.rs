@@ -125,6 +125,7 @@ pub fn sign_tx_by_input_group(
             if i == begin_index {
                 let mut blake2b = ckb_hash::new_blake2b();
                 let mut message = [0u8; 32];
+                dbg!(hex::encode(&tx_hash.raw_data()));
                 blake2b.update(&tx_hash.raw_data());
                 // digest the first witness
                 let witness = WitnessArgs::new_unchecked(tx.witnesses().get(i).unwrap().unpack());
@@ -133,18 +134,27 @@ pub fn sign_tx_by_input_group(
                     buf.resize(config.auth.get_sign_size(), 0);
                     buf.into()
                 };
+                dbg!(&witness);
+                dbg!(&witness
+                    .clone()
+                    .as_builder()
+                    .lock(Some(zero_lock.clone()).pack()));
                 let witness_for_digest = witness
                     .clone()
                     .as_builder()
                     .lock(Some(zero_lock).pack())
                     .build();
                 let witness_len = witness_for_digest.as_bytes().len() as u64;
+                dbg!(hex::encode(&witness_len.to_le_bytes()));
                 blake2b.update(&witness_len.to_le_bytes());
+                dbg!(hex::encode(&witness_for_digest.as_bytes()));
                 blake2b.update(&witness_for_digest.as_bytes());
                 ((i + 1)..(i + len)).for_each(|n| {
                     let witness = tx.witnesses().get(n).unwrap();
                     let witness_len = witness.raw_data().len() as u64;
+                    dbg!(hex::encode(&witness_len.to_le_bytes()));
                     blake2b.update(&witness_len.to_le_bytes());
+                    dbg!(hex::encode(&witness_for_digest.as_bytes()));
                     blake2b.update(&witness.raw_data());
                 });
                 blake2b.finalize(&mut message);
@@ -160,8 +170,9 @@ pub fn sign_tx_by_input_group(
                         Bytes::from(buff)
                     };
                 } else {
-                    dbg!(hex::encode(message));
+                    dbg!(hex::encode(&message));
                     let converted_message = config.auth.convert_message(&message);
+                    dbg!(hex::encode(&converted_message));
                     sig = config.auth.sign(&converted_message)
                 }
 
@@ -185,6 +196,13 @@ pub fn sign_tx_by_input_group(
                     }
                 };
 
+                dbg!(witness
+                    .clone()
+                    .as_builder()
+                    .lock(Some(sig2.clone()).pack())
+                    .build()
+                    .as_bytes()
+                    .pack());
                 witness
                     .as_builder()
                     .lock(Some(sig2).pack())
@@ -454,7 +472,9 @@ pub fn gen_args(config: &TestConfig) -> Bytes {
     bytes.put(Bytes::from(bincode::serialize(&ckb_auth_type).unwrap()));
     bytes.put(Bytes::from(bincode::serialize(&entry_type).unwrap()));
 
-    bytes.freeze()
+    let b = bytes.freeze();
+    dbg!(hex::encode(&b));
+    b
 }
 
 pub fn build_resolved_tx(
@@ -1175,7 +1195,6 @@ impl Auth for MoneroAuth {
         AlgorithmType::Monero as u8
     }
     fn convert_message(&self, message: &[u8; 32]) -> H256 {
-        dbg!(hex::encode(message));
         H256::from(message.clone())
     }
     fn sign(&self, msg: &H256) -> Bytes {
