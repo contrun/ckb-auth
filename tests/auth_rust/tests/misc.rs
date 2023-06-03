@@ -148,11 +148,9 @@ pub fn sign_tx_by_input_group(
                     blake2b.update(&witness.raw_data());
                 });
                 blake2b.finalize(&mut message);
-                dbg!(hex::encode(message));
                 if config.incorrect_msg {
                     rng.fill(&mut message);
                 }
-                dbg!(hex::encode(message));
                 let sig;
                 if config.incorrect_sign {
                     sig = {
@@ -160,7 +158,6 @@ pub fn sign_tx_by_input_group(
                         Bytes::from(buff)
                     };
                 } else {
-                    dbg!(hex::encode(message));
                     let converted_message = config.auth.convert_message(&message);
                     sig = config.auth.sign(&converted_message)
                 }
@@ -445,12 +442,6 @@ pub fn gen_args(config: &TestConfig) -> Bytes {
         .copy_from_slice(sighash_all_cell_data_hash.as_slice());
 
     let mut bytes = BytesMut::with_capacity(size_of::<CkbAuthType>() + size_of::<EntryType>());
-    dbg!(
-        &ckb_auth_type,
-        hex::encode(bincode::serialize(&ckb_auth_type).unwrap()),
-        &entry_type,
-        hex::encode(bincode::serialize(&entry_type).unwrap()),
-    );
     bytes.put(Bytes::from(bincode::serialize(&ckb_auth_type).unwrap()));
     bytes.put(Bytes::from(bincode::serialize(&entry_type).unwrap()));
 
@@ -1136,8 +1127,15 @@ impl LitecoinDaemon {
 
 #[derive(Clone)]
 pub struct MoneroAuth {
+    // A pair of spend key and view key. Both are needed the final hash to sign use their public
+    // keys.
     pub key_pair: monero::KeyPair,
+    // Mode used by monero-wallet-cli to sign messages. Valid values are 0 and 1.
+    // Must be 0 if use spend key to sign transaction, 1 if use view key to sign transaction.
+    // For simplicity, we use 0 only.
     pub mode: u8,
+    // Network of monero used, necessary to obtain the address.
+    pub network: monero::Network,
 }
 impl MoneroAuth {
     pub fn new() -> Box<MoneroAuth> {
@@ -1156,38 +1154,41 @@ impl MoneroAuth {
                 view: view_key,
                 spend: spend_key,
             };
-            let address = monero::Address::from_keypair(monero::Network::Mainnet, &keypair);
             keypair
         }
 
         let key_pair = get_test_key_pair();
         let mode = 0;
-        Box::new(MoneroAuth { key_pair, mode })
+        let network = monero::Network::Mainnet;
+        Box::new(MoneroAuth {
+            key_pair,
+            mode,
+            network,
+        })
+    }
+    pub fn get_address(&self) -> String {
+        monero::Address::from_keypair(self.network, &self.key_pair).to_string()
     }
 }
 impl Auth for MoneroAuth {
     fn get_pub_key_hash(&self) -> Vec<u8> {
-        let spend_pubkey = monero::PublicKey::from_private_key(&self.key_pair.spend);
-        let spend_pubkey = spend_pubkey.as_bytes();
-        Vec::from(&ckb_hash::blake2b_256(spend_pubkey)[..20])
+        Vec::from(&ckb_hash::blake2b_256(self.get_address())[..20])
     }
     fn get_algorithm_type(&self) -> u8 {
         AlgorithmType::Monero as u8
     }
     fn convert_message(&self, message: &[u8; 32]) -> H256 {
-        dbg!(hex::encode(message));
         H256::from(message.clone())
     }
     fn sign(&self, msg: &H256) -> Bytes {
         let message_hex = hex::encode(msg.as_bytes());
-        dbg!(&message_hex);
 
-        let address =
-            monero::Address::from_keypair(monero::Network::Mainnet, &self.key_pair).to_string();
+        let address = self.get_address();
         let spend_key = hex::encode(self.key_pair.spend.to_bytes());
         let view_key = hex::encode(self.key_pair.view.to_bytes());
         let password = "pw";
-        // See https://monero.stackexchange.com/questions/10385/creating-a-wallet-in-non-interactive-mode-using-monero-wallet-cli
+        // Click below link for instruction on creating a wallet non-interactively
+        // https://monero.stackexchange.com/questions/10385/creating-a-wallet-in-non-interactive-mode-using-monero-wallet-cli
         let stdin_to_create_wallet = format!(
             "{}\n{}\n{}\n{}\n{}\n0\nN\n",
             address, spend_key, view_key, password, password,
@@ -1197,9 +1198,13 @@ impl Auth for MoneroAuth {
         let command = format!(
             r###"rm -f {wallet_file_name}*; rm -f {message_file_name}; trap '(rm -f {wallet_file_name}*; rm -f {message_file_name})' EXIT INT TERM; printf '{stdin_to_create_wallet}' | monero-wallet-cli --offline --generate-from-keys {wallet_file_name}; printf '%b' $(printf {message_hex} | fold -b2 | sed 's#^#\\x#') > {message_file_name}; echo '{password}' | monero-wallet-cli --offline --wallet-file {wallet_file_name} --password {password} sign {message_file_name}"###
         );
+        println!(
+            "Running shell command to generate monero signature: {}",
+            &command
+        );
         let output = Command::new("sh").arg("-c").arg(&command).output().unwrap();
-        dbg!(
-            &command,
+        println!(
+            "Shell command outputs: {}",
             std::str::from_utf8(&output.stdout).unwrap_or(&format!("{:?}", &output.stdout))
         );
         let signature = std::str::from_utf8(&output.stdout)
@@ -1210,12 +1215,11 @@ impl Auth for MoneroAuth {
         assert_eq!(&signature[..5], "SigV2");
         // Note: must use base58_monero crate here. The output of other
         // base58 library is imcompatible to monero's implementation of base58.
-        let decoded = base58_monero::decode(&signature[5..]).unwrap();
-        assert_eq!(decoded.len(), 64);
-        dbg!(hex::encode(&decoded));
+        let signature = base58_monero::decode(&signature[5..]).unwrap();
+        assert_eq!(signature.len(), 64);
 
-        let mut data = BytesMut::with_capacity(decoded.len() + 65);
-        data.put(decoded.as_slice());
+        let mut data = BytesMut::with_capacity(signature.len() + 65);
+        data.put(signature.as_slice());
         data.put_u8(self.mode);
         let spend_pubkey = monero::PublicKey::from_private_key(&self.key_pair.spend);
         let spend_pubkey = spend_pubkey.as_bytes();
@@ -1224,7 +1228,6 @@ impl Auth for MoneroAuth {
         let view_pubkey = view_pubkey.as_bytes();
         data.put(view_pubkey);
         let bytes = data.freeze();
-        dbg!(hex::encode(&bytes));
         bytes
     }
     fn get_sign_size(&self) -> usize {

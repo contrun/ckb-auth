@@ -1,6 +1,3 @@
-#define CKB_C_STDLIB_PRINTF
-#include <stdio.h>
-
 // clang-format off
 #include "mbedtls/md.h"
 #include "mbedtls/md_internal.h"
@@ -372,7 +369,6 @@ exit:
 // See
 // https://github.com/monero-project/monero/blob/e06129bb4d1076f4f2cebabddcee09f1e9e30dcc/src/common/varint.h#L64-L79
 size_t write_varint(uint8_t *dest, size_t n) {
-    printf("dest: %p, n: %d\n", dest, n);
     uint8_t *ptr = dest;
     /* Make sure that there is one after this */
     while (n >= 0x80) {
@@ -384,79 +380,7 @@ size_t write_varint(uint8_t *dest, size_t n) {
     /* writes the last one to dest */
     *ptr = (uint8_t)(n);
     ptr++;
-    printf("ptr: %p, dest: %p, ptr - dest: %d\n", ptr, dest, ptr - dest);
     return ptr - dest;
-}
-
-// Usage:
-//     hex_dump(desc, addr, len, perLine);
-//         desc:    if non-NULL, printed as a description before hex dump.
-//         addr:    the address to start dumping from.
-//         len:     the number of bytes to dump.
-//         perLine: number of bytes on each output line.
-
-void hex_dump(const char *desc, const void *addr, const int len, int perLine) {
-    // Silently ignore silly per-line values.
-
-    if (perLine < 4 || perLine > 64) perLine = 16;
-
-    int i;
-    unsigned char buff[perLine + 1];
-    const unsigned char *pc = (const unsigned char *)addr;
-
-    // Output description if given.
-
-    if (desc != NULL) printf("%s:\n", desc);
-
-    // Length checks.
-
-    if (len == 0) {
-        printf("  ZERO LENGTH\n");
-        return;
-    }
-    if (len < 0) {
-        printf("  NEGATIVE LENGTH: %d\n", len);
-        return;
-    }
-
-    // Process every byte in the data.
-
-    for (i = 0; i < len; i++) {
-        // Multiple of perLine means new or first line (with line offset).
-
-        if ((i % perLine) == 0) {
-            // Only print previous-line ASCII buffer for lines beyond first.
-
-            if (i != 0) printf("  %s\n", buff);
-
-            // Output the offset of current line.
-
-            printf("  %04x ", i);
-        }
-
-        // Now the hex code for the specific character.
-
-        printf(" %02x", pc[i]);
-
-        // And buffer a printable ASCII character for later.
-
-        if ((pc[i] < 0x20) || (pc[i] > 0x7e))  // isprint() may be better.
-            buff[i % perLine] = '.';
-        else
-            buff[i % perLine] = pc[i];
-        buff[(i % perLine) + 1] = '\0';
-    }
-
-    // Pad out last line if not exactly perLine characters.
-
-    while ((i % perLine) != 0) {
-        printf("   ");
-        i++;
-    }
-
-    // And print the final ASCII buffer.
-
-    printf("  %s\n", buff);
 }
 
 // Get monero hash digest from message.
@@ -471,22 +395,15 @@ void get_monero_message_hash(uint8_t hash[MONERO_KECCAK_SIZE],
 
     keccak_update(&ctx, (uint8_t *)MONERO_HASH_KEY_MESSAGE_SIGNING,
                   sizeof(MONERO_HASH_KEY_MESSAGE_SIGNING));  // includes NUL
-    hex_dump("prefix message", (const void *)MONERO_HASH_KEY_MESSAGE_SIGNING,
-             sizeof(MONERO_HASH_KEY_MESSAGE_SIGNING), 0);
     keccak_update(&ctx, spend_pubkey, MONERO_PUBKEY_SIZE);
-    hex_dump("spend_pubkey", (const void *)spend_pubkey, MONERO_PUBKEY_SIZE, 0);
     keccak_update(&ctx, view_pubkey, MONERO_PUBKEY_SIZE);
-    hex_dump("view_pubkey", (const void *)view_pubkey, MONERO_PUBKEY_SIZE, 0);
     keccak_update(&ctx, &mode, sizeof(mode));
-    hex_dump("mode", (const void *)&mode, sizeof(mode), 0);
 
     uint8_t len_buf[(sizeof(size_t) * 8 + 6) / 7];
     size_t written_bytes = write_varint((uint8_t *)len_buf, msg_len);
     keccak_update(&ctx, (uint8_t *)len_buf, written_bytes);
-    hex_dump("varint len_buf", (const void *)len_buf, written_bytes, 0);
 
     keccak_update(&ctx, (uint8_t *)msg, msg_len);
-    hex_dump("message", (const void *)msg, msg_len, 0);
 
     keccak_final(&ctx, (uint8_t *)hash);
 }
@@ -502,9 +419,7 @@ void monero_hash_to_scalar(uint8_t *msg, size_t msg_len, uint8_t *key,
     keccak_update(&sha3_ctx, comm, 32);
     keccak_final(&sha3_ctx, state);
     memcpy(scalar, &state, 32);
-    hex_dump("hash_to_scalar before reduce", scalar, 32, 0);
     sc_reduce32(scalar);
-    hex_dump("hash_to_scalar after reduce", scalar, 32, 0);
 }
 
 // See
@@ -521,8 +436,6 @@ int ed25519_verify_monero(const unsigned char *signature,
     uint8_t zero[32];
     uint8_t sig_c_neg[32];
 
-    hex_dump("sig_c", sig_c, 32, 0);
-    hex_dump("sig_r", sig_r, 32, 0);
     if (sc_check(sig_c) != 0 || sc_check(sig_r) != 0 || !sc_isnonzero(sig_c)) {
         return 0;
     }
@@ -531,13 +444,11 @@ int ed25519_verify_monero(const unsigned char *signature,
     // scalar
     sc_0(zero);
     sc_sub(sig_c_neg, zero, sig_c);
-    hex_dump("sig_c_neg", sig_c_neg, sizeof(sig_c_neg), 0);
     if (ge_frombytes_negate_vartime(&tmp3, public_key) != 0) {
         return 0;
     }
     ge_double_scalarmult_vartime(&tmp2, sig_c_neg, &tmp3, sig_r);
     ge_tobytes(comm, &tmp2);
-    hex_dump("comm", comm, sizeof(comm), 0);
 
     static const uint8_t infinity[32] = {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -545,11 +456,7 @@ int ed25519_verify_monero(const unsigned char *signature,
     if (memcmp(&comm, &infinity, 32) == 0) return 0;
     monero_hash_to_scalar((uint8_t *)message, message_len,
                           (uint8_t *)public_key, comm, c);
-    hex_dump("hash to scalar c", c, sizeof(c), 0);
-    hex_dump("sig_c", sig_c, 32, 0);
     sc_sub(c, c, sig_c);
-    hex_dump("final result c", c, sizeof(c), 0);
-    printf("final result is non zero %d\n", sc_isnonzero((const uint8_t *)c));
     return sc_isnonzero((const uint8_t *)c) == 0;
 }
 
@@ -558,9 +465,6 @@ int validate_signature_monero(void *prefilled_data, const uint8_t *sig,
                               size_t msg_len, uint8_t *output,
                               size_t *output_len) {
     int err = 0;
-
-    hex_dump("sig", (const void *)sig, sig_len, 0);
-    hex_dump("msg", (const void *)msg, msg_len, 0);
 
     CHECK2(msg_len == BLAKE2B_BLOCK_SIZE, ERROR_INVALID_ARG);
     CHECK2(sig_len == MONERO_DATA_SIZE, ERROR_INVALID_ARG);
@@ -576,10 +480,7 @@ int validate_signature_monero(void *prefilled_data, const uint8_t *sig,
     get_monero_message_hash(hash, spend_pubkey, view_pubkey, *mode_ptr, msg,
                             msg_len);
 
-    hex_dump("hash", (const void *)hash, sizeof(hash), 0);
-    hex_dump("pubkey", (const void *)pubkey, MONERO_PUBKEY_SIZE, 0);
     int suc = ed25519_verify_monero(sig, hash, sizeof(hash), pubkey);
-    printf("return code: %d\n", suc);
     CHECK2(suc == 1, ERROR_EXEC_INVALID_SIG);
 
     blake2b_state ctx;
@@ -600,7 +501,6 @@ int convert_copy(const uint8_t *msg, size_t msg_len, uint8_t *new_msg,
     if (msg_len != new_msg_len || msg_len != BLAKE2B_BLOCK_SIZE)
         return ERROR_INVALID_ARG;
     memcpy(new_msg, msg, msg_len);
-    hex_dump("converting message", (const void *)msg, msg_len, 0);
     return 0;
 }
 
@@ -945,7 +845,6 @@ __attribute__((visibility("default"))) int ckb_auth_validate(
     uint8_t auth_algorithm_id, const uint8_t *signature,
     uint32_t signature_size, const uint8_t *message, uint32_t message_size,
     uint8_t *pubkey_hash, uint32_t pubkey_hash_size) {
-    hex_dump("message in ckb_auth_validate", message, message_size, 0);
     int err = 0;
     CHECK2(signature != NULL, ERROR_INVALID_ARG);
     CHECK2(message != NULL, ERROR_INVALID_ARG);
@@ -999,7 +898,6 @@ __attribute__((visibility("default"))) int ckb_auth_validate(
                      message_size, validate_signature_cardano, convert_copy);
         CHECK(err);
     } else if (auth_algorithm_id == AuthAlgorithmIdMonero) {
-        hex_dump("message before verify", message, message_size, 0);
         err = verify(pubkey_hash, signature, signature_size, message,
                      message_size, validate_signature_monero, convert_copy);
         CHECK(err);
@@ -1145,12 +1043,9 @@ int main(int argc, char *argv[]) {
         // if next is NULL, in last iterator, it encounters \0.
         // when error is returned, there must be an error in call
         if (next == NULL) break;
-        printf("decoding args: %s\n", next);
         err = ckb_exec_decode_params(next, &param_ptr, &param_len, &next);
         CHECK(err);
 
-        printf("param_index: %d\n", param_index);
-        hex_dump("parameter", param_ptr, param_len, 0);
         if (param_index == 0) {
             // code hash
             CHECK2(param_len == 32, ERROR_EXEC_INVALID_LENGTH);
@@ -1180,7 +1075,6 @@ int main(int argc, char *argv[]) {
             entries[entry_index].msg = param_ptr;
             entries[entry_index].msg_len = param_len;
             entries[entry_index].has_msg = true;
-            hex_dump("message in decoding", param_ptr, param_len, 0);
         } else if ((param_index - 2) % 4 == 3) {
             // pubkey hash
             CHECK2(param_len > 0, ERROR_EXEC_INVALID_LENGTH);
@@ -1206,7 +1100,6 @@ int main(int argc, char *argv[]) {
         CHECK2(entry->has_msg, ERROR_EXEC_INVALID_PARAM);
         CHECK2(entry->has_sig, ERROR_EXEC_INVALID_PARAM);
         CHECK2(entry->has_pubkey, ERROR_EXEC_INVALID_PARAM);
-        hex_dump("message before ckb_auth_validate", entry->msg, entry->msg_len, 0);
         err = ckb_auth_validate(entry->auth_algorithm_id, entry->sig,
                                 entry->sig_len, entry->msg, entry->msg_len,
                                 entry->pubkey_hash, entry->pubkey_hash_len);
@@ -1225,3 +1118,7 @@ int main(int argc, char *argv[]) {
 exit:
     return err;
 }
+
+
+
+
