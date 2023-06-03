@@ -4,10 +4,6 @@
 //
 // witness lock: signature
 
-#define CKB_C_STDLIB_PRINTF
-#include <stdio.h>
-
-
 #include "blake2b.h"
 #include "blockchain.h"
 #include "ckb_auth.h"
@@ -20,77 +16,6 @@
 #define SCRIPT_SIZE 32768
 
 #define ONE_BATCH_SIZE 32768
-
-// Usage:
-//     hex_dump(desc, addr, len, perLine);
-//         desc:    if non-NULL, printed as a description before hex dump.
-//         addr:    the address to start dumping from.
-//         len:     the number of bytes to dump.
-//         perLine: number of bytes on each output line.
-
-void hex_dump(const char *desc, const void *addr, const int len, int perLine) {
-    // Silently ignore silly per-line values.
-
-    if (perLine < 4 || perLine > 64) perLine = 16;
-
-    int i;
-    unsigned char buff[perLine + 1];
-    const unsigned char *pc = (const unsigned char *)addr;
-
-    // Output description if given.
-
-    if (desc != NULL) printf("%s:\n", desc);
-
-    // Length checks.
-
-    if (len == 0) {
-        printf("  ZERO LENGTH\n");
-        return;
-    }
-    if (len < 0) {
-        printf("  NEGATIVE LENGTH: %d\n", len);
-        return;
-    }
-
-    // Process every byte in the data.
-
-    for (i = 0; i < len; i++) {
-        // Multiple of perLine means new or first line (with line offset).
-
-        if ((i % perLine) == 0) {
-            // Only print previous-line ASCII buffer for lines beyond first.
-
-            if (i != 0) printf("  %s\n", buff);
-
-            // Output the offset of current line.
-
-            printf("  %04x ", i);
-        }
-
-        // Now the hex code for the specific character.
-
-        printf(" %02x", pc[i]);
-
-        // And buffer a printable ASCII character for later.
-
-        if ((pc[i] < 0x20) || (pc[i] > 0x7e))  // isprint() may be better.
-            buff[i % perLine] = '.';
-        else
-            buff[i % perLine] = pc[i];
-        buff[(i % perLine) + 1] = '\0';
-    }
-
-    // Pad out last line if not exactly perLine characters.
-
-    while ((i % perLine) != 0) {
-        printf("   ");
-        i++;
-    }
-
-    // And print the final ASCII buffer.
-
-    printf("  %s\n", buff);
-}
 
 static int extract_witness_lock(uint8_t *witness, uint64_t len,
                                 mol_seg_t *lock_bytes_seg) {
@@ -116,11 +41,9 @@ int load_and_hash_witness(blake2b_state *ctx, size_t start, size_t index,
     return ret;
   }
   if (hash_length) {
-    hex_dump("hash length", (char *)&len, sizeof(uint64_t), 0);
     blake2b_update(ctx, (char *)&len, sizeof(uint64_t));
   }
   uint64_t offset = (len > ONE_BATCH_SIZE) ? ONE_BATCH_SIZE : len;
-  hex_dump("temp", temp, offset, 0);
   blake2b_update(ctx, temp, offset);
   while (offset < len) {
     uint64_t current_len = ONE_BATCH_SIZE;
@@ -130,7 +53,6 @@ int load_and_hash_witness(blake2b_state *ctx, size_t start, size_t index,
     }
     uint64_t current_read =
         (current_len > ONE_BATCH_SIZE) ? ONE_BATCH_SIZE : current_len;
-    hex_dump("temp", temp, current_read, 0);
     blake2b_update(ctx, temp, current_read);
     offset += current_read;
   }
@@ -157,7 +79,6 @@ int generate_sighash_all(uint8_t *msg, size_t msg_len) {
   if (read_len > MAX_WITNESS_SIZE) {
     read_len = MAX_WITNESS_SIZE;
   }
-  hex_dump("witness", temp, read_len, 0);
 
   /* load signature */
   mol_seg_t lock_bytes_seg;
@@ -180,16 +101,13 @@ int generate_sighash_all(uint8_t *msg, size_t msg_len) {
   /* Prepare sign message */
   blake2b_state blake2b_ctx;
   blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
-  hex_dump("tx_hash", tx_hash, BLAKE2B_BLOCK_SIZE, 0);
   blake2b_update(&blake2b_ctx, tx_hash, BLAKE2B_BLOCK_SIZE);
 
   /* Clear lock field to zero, then digest the first witness
    * lock_bytes_seg.ptr actually points to the memory in temp buffer
    * */
   memset((void *)lock_bytes_seg.ptr, 0, lock_bytes_seg.size);
-  hex_dump("witness_len", (char *)&witness_len, sizeof(uint64_t), 0);
   blake2b_update(&blake2b_ctx, (char *)&witness_len, sizeof(uint64_t));
-  hex_dump("witness", temp, read_len, 0);
   blake2b_update(&blake2b_ctx, temp, read_len);
 
   // remaining of first witness
