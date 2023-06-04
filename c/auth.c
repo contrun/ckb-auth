@@ -487,7 +487,7 @@ int validate_signature_monero(void *prefilled_data, const uint8_t *sig,
     uint8_t pubkey_hash[BLAKE2B_BLOCK_SIZE] = {0};
     blake2b_init(&ctx, BLAKE2B_BLOCK_SIZE);
     // TODO: find out the official way of get monero pubkey
-    blake2b_update(&ctx, spend_pubkey, MONERO_PUBKEY_SIZE);
+    blake2b_update(&ctx, mode_ptr, 1 + MONERO_PUBKEY_SIZE * 2);
     blake2b_final(&ctx, pubkey_hash, sizeof(pubkey_hash));
 
     memcpy(output, pubkey_hash, BLAKE160_SIZE);

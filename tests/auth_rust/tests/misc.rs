@@ -1172,7 +1172,15 @@ impl MoneroAuth {
 }
 impl Auth for MoneroAuth {
     fn get_pub_key_hash(&self) -> Vec<u8> {
-        Vec::from(&ckb_hash::blake2b_256(self.get_address())[..20])
+        let public_spend = monero::PublicKey::from_private_key(&self.key_pair.spend);
+        let public_view = monero::PublicKey::from_private_key(&self.key_pair.view);
+        let mut buff = BytesMut::with_capacity(1 + 32*2);
+        buff.put_u8(self.mode);
+        buff.put(public_spend.as_bytes());
+        buff.put(public_view.as_bytes());
+        let bytes = buff.freeze();
+        dbg!(hex::encode(&bytes));
+        Vec::from(&ckb_hash::blake2b_256(bytes)[..20])
     }
     fn get_algorithm_type(&self) -> u8 {
         AlgorithmType::Monero as u8
