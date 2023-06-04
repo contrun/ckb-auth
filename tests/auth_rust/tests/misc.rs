@@ -1132,23 +1132,27 @@ pub struct MoneroAuth {
     pub key_pair: monero::KeyPair,
     // Mode used by monero-wallet-cli to sign messages. Valid values are 0 and 1.
     // Must be 0 if use spend key to sign transaction, 1 if use view key to sign transaction.
-    // For simplicity, we use 0 only.
     pub mode: u8,
     // Network of monero used, necessary to obtain the address.
     pub network: monero::Network,
 }
 impl MoneroAuth {
     pub fn new() -> Box<MoneroAuth> {
-        fn get_test_key_pair() -> monero::KeyPair {
-            let view_key: [u8; 32] = hex_literal::hex!(
-                "972874ae95f5c167285858141e940847398f9c246c7913c0d396b6d73b484105"
-            );
-            let view_key = monero::PrivateKey::from_slice(&view_key).unwrap();
-
-            let spend_key: [u8; 32] = hex_literal::hex!(
-                "8ef26aced8b5f8e1e8ce63b6c75ac6ee41424242424242424242424242424202"
-            );
-            let spend_key = monero::PrivateKey::from_slice(&spend_key).unwrap();
+        fn get_random_key_pair() -> monero::KeyPair {
+            let mut rng = thread_rng();
+            let mut seed = vec![0; 32];
+            let spend_key = loop {
+                rng.fill(seed.as_mut_slice());
+                if let Ok(key) = monero::PrivateKey::from_slice(&seed) {
+                    break key;
+                }
+            };
+            let view_key = loop {
+                rng.fill(seed.as_mut_slice());
+                if let Ok(key) = monero::PrivateKey::from_slice(&seed) {
+                    break key;
+                }
+            };
 
             let keypair = monero::KeyPair {
                 view: view_key,
@@ -1157,7 +1161,7 @@ impl MoneroAuth {
             keypair
         }
 
-        let key_pair = get_test_key_pair();
+        let key_pair = get_random_key_pair();
         let mode = 0;
         let network = monero::Network::Mainnet;
         Box::new(MoneroAuth {
