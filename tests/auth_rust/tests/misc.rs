@@ -1178,7 +1178,7 @@ impl Auth for MoneroAuth {
     fn get_pub_key_hash(&self) -> Vec<u8> {
         let public_spend = monero::PublicKey::from_private_key(&self.key_pair.spend);
         let public_view = monero::PublicKey::from_private_key(&self.key_pair.view);
-        let mut buff = BytesMut::with_capacity(1 + 32*2);
+        let mut buff = BytesMut::with_capacity(1 + 32 * 2);
         buff.put_u8(self.mode);
         buff.put(public_spend.as_bytes());
         buff.put(public_view.as_bytes());
@@ -1202,19 +1202,71 @@ impl Auth for MoneroAuth {
         // Click below link for instruction on creating a wallet non-interactively
         // https://monero.stackexchange.com/questions/10385/creating-a-wallet-in-non-interactive-mode-using-monero-wallet-cli
         let stdin_to_create_wallet = format!(
-            "{}\n{}\n{}\n{}\n{}\n0\nN\n",
+            "{}\\n{}\\n{}\\n{}\\n{}\\n0\\nN\\n",
             address, spend_key, view_key, password, password,
         );
         let wallet_file_name = "ckb-auth-test-wallet";
         let message_file_name = "ckb-auth-test-message";
+        let run_command_get_output = |command| {
+            println!(
+                "Running shell command: {}",
+                &command
+            );
+            // let status = Command::new("bash")
+            //     .arg("-c")
+            //     .arg(&command)
+            //     .status()
+            //     .unwrap();
+            // dbg!(status);
+            // assert!(status.success());
+            let output = Command::new("bash")
+                .arg("-c")
+                .arg(&command)
+                .output()
+                .unwrap();
+            println!(
+                "Shell command outputs: {}",
+                std::str::from_utf8(&output.stdout).unwrap_or(&format!("{:?}", &output.stdout))
+            );
+        };
+        run_command_get_output(format!(r###"echo abc | echo def"###));
+        run_command_get_output(format!(r###"set -xeuo pipefail"###));
+        run_command_get_output(format!(r###"rm -f {wallet_file_name}*"###));
+        run_command_get_output(format!(r###"rm -f {message_file_name}"###));
+        run_command_get_output(format!(
+            r###"trap '(rm -f {wallet_file_name}*; rm -f {message_file_name})' EXIT INT TERM"###
+        ));
+        run_command_get_output(format!(
+            r###"printf '{stdin_to_create_wallet}' | monero-wallet-cli --offline --generate-from-keys {wallet_file_name}"###
+        ));
+        run_command_get_output(format!(
+            r###"printf '%b' $(printf {message_hex} | fold -b2 | sed 's#^#\\x#') > {message_file_name}"###
+        ));
+        run_command_get_output(format!(
+            r###"echo '{password}' | monero-wallet-cli --offline --wallet-file {wallet_file_name} --password {password} sign {message_file_name}"###
+        ));
+        run_command_get_output(format!(
+            r###"set -xeuo pipefail; for i in {wallet_file_name}* {message_file_name}; do rm -f "$i"; done; trap '(rm -f {wallet_file_name}*; rm -f {message_file_name})' EXIT INT TERM; printf '{stdin_to_create_wallet}' | monero-wallet-cli --offline --generate-from-keys {wallet_file_name}; printf '%b' $(printf {message_hex} | fold -b2 | sed 's#^#\\x#') > {message_file_name}; echo '{password}' | monero-wallet-cli --offline --wallet-file {wallet_file_name} --password {password} sign {message_file_name}"###
+        ));
         let command = format!(
-            r###"rm -f {wallet_file_name}*; rm -f {message_file_name}; trap '(rm -f {wallet_file_name}*; rm -f {message_file_name})' EXIT INT TERM; printf '{stdin_to_create_wallet}' | monero-wallet-cli --offline --generate-from-keys {wallet_file_name}; printf '%b' $(printf {message_hex} | fold -b2 | sed 's#^#\\x#') > {message_file_name}; echo '{password}' | monero-wallet-cli --offline --wallet-file {wallet_file_name} --password {password} sign {message_file_name}"###
+            r###"set -xeuo pipefail; rm -f {wallet_file_name}*; rm -f {message_file_name}; trap '(rm -f {wallet_file_name}*; rm -f {message_file_name})' EXIT INT TERM; printf '{stdin_to_create_wallet}' | monero-wallet-cli --offline --generate-from-keys {wallet_file_name}; printf '%b' $(printf {message_hex} | fold -b2 | sed 's#^#\\x#') > {message_file_name}; echo '{password}' | monero-wallet-cli --offline --wallet-file {wallet_file_name} --password {password} sign {message_file_name}"###
         );
         println!(
             "Running shell command to generate monero signature: {}",
             &command
         );
-        let output = Command::new("sh").arg("-c").arg(&command).output().unwrap();
+        let output = Command::new("bash")
+            .arg("-c")
+            .arg(&command)
+            .status()
+            .unwrap();
+        dbg!(output);
+        assert!(output.success());
+        let output = Command::new("bash")
+            .arg("-c")
+            .arg(&command)
+            .output()
+            .unwrap();
         println!(
             "Shell command outputs: {}",
             std::str::from_utf8(&output.stdout).unwrap_or(&format!("{:?}", &output.stdout))
