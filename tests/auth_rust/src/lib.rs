@@ -105,6 +105,56 @@ pub fn sign_tx(tx: TransactionView, config: &TestConfig) -> TransactionView {
     sign_tx_by_input_group(tx, config, 0, witnesses_len)
 }
 
+pub fn get_message_to_sign(tx: TransactionView, config: &TestConfig) -> H256 {
+    let witnesses_len = tx.witnesses().len();
+    get_message_to_sign_by_input_group(tx, config, 0, witnesses_len)
+}
+
+pub fn get_message_to_sign_by_input_group(
+    tx: TransactionView,
+    config: &TestConfig,
+    begin_index: usize,
+    len: usize,
+) -> H256 {
+    let tx_hash = tx.hash();
+    tx.inputs()
+        .into_iter()
+        .enumerate()
+        .find_map(|(i, _)| {
+            if i == begin_index {
+                let mut blake2b = ckb_hash::new_blake2b();
+                let mut message = [0u8; 32];
+                blake2b.update(&tx_hash.raw_data());
+                // digest the first witness
+                let witness = WitnessArgs::new_unchecked(tx.witnesses().get(i).unwrap().unpack());
+                let zero_lock: Bytes = {
+                    let mut buf = Vec::new();
+                    buf.resize(config.auth.get_sign_size(), 0);
+                    buf.into()
+                };
+                let witness_for_digest = witness
+                    .clone()
+                    .as_builder()
+                    .lock(Some(zero_lock).pack())
+                    .build();
+                let witness_len = witness_for_digest.as_bytes().len() as u64;
+                blake2b.update(&witness_len.to_le_bytes());
+                blake2b.update(&witness_for_digest.as_bytes());
+                ((i + 1)..(i + len)).for_each(|n| {
+                    let witness = tx.witnesses().get(n).unwrap();
+                    let witness_len = witness.raw_data().len() as u64;
+                    blake2b.update(&witness_len.to_le_bytes());
+                    blake2b.update(&witness.raw_data());
+                });
+                blake2b.finalize(&mut message);
+                Some(config.auth.convert_message(&message))
+            } else {
+                None
+            }
+        })
+        .unwrap()
+}
+
 pub fn sign_tx_by_input_group(
     tx: TransactionView,
     config: &TestConfig,
@@ -1146,4 +1196,3 @@ impl Auth for OwnerLockAuth {
         Bytes::from([0; 64].to_vec())
     }
 }
-
