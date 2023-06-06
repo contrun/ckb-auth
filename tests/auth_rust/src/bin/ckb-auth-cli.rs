@@ -62,7 +62,13 @@ fn main() {
     }
 }
 
-fn parse_address(blockchain: &str, address: &str) {}
+fn parse_address(blockchain: &str, address: &str) {
+    let algorithm_type = AlgorithmType::Bitcoin;
+    let run_type = EntryCategoryType::Exec;
+    let auth = auth_builder(algorithm_type).unwrap();
+    dbg!(hex::encode(auth.get_pub_key_hash()));
+}
+
 fn generate_message(blockchain: &str, pubkey: &str) {
     let algorithm_type = AlgorithmType::Bitcoin;
     let run_type = EntryCategoryType::Exec;
