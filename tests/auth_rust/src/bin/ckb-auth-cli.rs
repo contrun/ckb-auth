@@ -2,10 +2,14 @@ use clap::{arg, Arg, Command};
 
 use ckb_auth_rs::{
     assert_script_error, auth_builder, build_resolved_tx, debug_printer, gen_args, gen_tx,
-    gen_tx_with_grouped_args, get_message_to_sign, sign_tx, AlgorithmType, Auth, AuthErrorCodeType,
-    BitcoinAuth, CKbAuth, CkbMultisigAuth, DogecoinAuth, DummyDataLoader, EntryCategoryType,
-    EosAuth, EthereumAuth, SchnorrAuth, TestConfig, TronAuth, MAX_CYCLES,
+    gen_tx_with_grouped_args, get_message_to_sign, set_signature, sign_tx, AlgorithmType, Auth,
+    AuthErrorCodeType, BitcoinAuth, CKbAuth, CkbMultisigAuth, DogecoinAuth, DummyDataLoader,
+    EntryCategoryType, EosAuth, EthereumAuth, SchnorrAuth, TestConfig, TronAuth, MAX_CYCLES,
 };
+
+use ckb_script::TransactionScriptsVerifier;
+use ckb_types::bytes::{BufMut, Bytes, BytesMut};
+use std::sync::Arc;
 
 fn main() {
     let matches = Command::new("CKB-Auth CLI")
@@ -31,7 +35,7 @@ fn main() {
             Command::new("verify")
                 .about("Verify a signature")
                 .arg_required_else_help(true)
-                .arg(arg!(-p --pubkey <PUBKEY_HASH> "The pubkey hash to verify against"))
+                .arg(arg!(-p --pubkeyhash <PUBKEYHASH> "The pubkey hash to verify against"))
                 .arg(arg!(-s --signature <SIGNATURE> "The signature to verify")),
         )
         .get_matches();
@@ -48,7 +52,7 @@ fn main() {
             generate_message(&blockchain, &pubkey);
         }
         Some(("verify", verify_matches)) => {
-            let pubkey_hash = verify_matches.get_one::<String>("pubkey_hash").unwrap();
+            let pubkey_hash = verify_matches.get_one::<String>("pubkeyhash").unwrap();
             let signature = verify_matches.get_one::<String>("signature").unwrap();
             verify_signature(&blockchain, &pubkey_hash, &signature);
         }
@@ -69,4 +73,18 @@ fn generate_message(blockchain: &str, pubkey: &str) {
     let message_to_sign = get_message_to_sign(tx, &config);
     dbg!(hex::encode(message_to_sign.as_bytes()));
 }
-fn verify_signature(blockchain: &str, pubkey_hash: &str, signature: &str) {}
+fn verify_signature(blockchain: &str, pubkey_hash: &str, signature: &str) {
+    let algorithm_type = AlgorithmType::Bitcoin;
+    let run_type = EntryCategoryType::Exec;
+    let auth = auth_builder(algorithm_type).unwrap();
+    let config = TestConfig::new(&auth, run_type, 1);
+    let mut data_loader = DummyDataLoader::new();
+    let tx = gen_tx(&mut data_loader, &config);
+    let signature = Bytes::new();
+    let tx = set_signature(tx, &config, &signature);
+    let resolved_tx = build_resolved_tx(&data_loader, &tx);
+
+    let mut verifier = TransactionScriptsVerifier::new(Arc::new(resolved_tx), data_loader.clone());
+    verifier.set_debug_printer(debug_printer);
+    assert!(verifier.verify(MAX_CYCLES).is_ok());
+}

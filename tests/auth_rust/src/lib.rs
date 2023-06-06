@@ -155,6 +155,51 @@ pub fn get_message_to_sign_by_input_group(
         .unwrap()
 }
 
+pub fn set_signature(
+    tx: TransactionView,
+    config: &TestConfig,
+    signature: &Bytes,
+) -> TransactionView {
+    let witnesses_len = tx.witnesses().len();
+    set_signature_by_input_group(tx, config, signature, 0, witnesses_len)
+}
+
+pub fn set_signature_by_input_group(
+    tx: TransactionView,
+    config: &TestConfig,
+    signature: &Bytes,
+    begin_index: usize,
+    len: usize,
+) -> TransactionView {
+    // We need to pass to ownership of signature to the closure in map below.
+    let mut signed_witnesses: Vec<packed::Bytes> = tx
+        .inputs()
+        .into_iter()
+        .enumerate()
+        .map(|(i, _)| {
+            if i == begin_index {
+                let witness =
+                    WitnessArgs::new_unchecked(tx.witnesses().get(i).unwrap_or_default().unpack());
+                witness
+                    .as_builder()
+                    .lock(Some(signature.clone()).pack())
+                    .build()
+                    .as_bytes()
+                    .pack()
+            } else {
+                tx.witnesses().get(i).unwrap_or_default()
+            }
+        })
+        .collect();
+    for i in signed_witnesses.len()..tx.witnesses().len() {
+        signed_witnesses.push(tx.witnesses().get(i).unwrap());
+    }
+    // calculate message
+    tx.as_advanced_builder()
+        .set_witnesses(signed_witnesses)
+        .build()
+}
+
 pub fn sign_tx_by_input_group(
     tx: TransactionView,
     config: &TestConfig,
