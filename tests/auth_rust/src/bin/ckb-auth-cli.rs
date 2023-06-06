@@ -1,5 +1,12 @@
 use clap::{arg, Arg, Command};
 
+use ckb_auth_rs::{
+    assert_script_error, auth_builder, build_resolved_tx, debug_printer, gen_args, gen_tx,
+    gen_tx_with_grouped_args, sign_tx, AlgorithmType, Auth, AuthErrorCodeType, BitcoinAuth,
+    CKbAuth, CkbMultisigAuth, DogecoinAuth, DummyDataLoader, EntryCategoryType, EosAuth,
+    EthereumAuth, SchnorrAuth, TestConfig, TronAuth, MAX_CYCLES,
+};
+
 fn main() {
     let matches = Command::new("CKB-Auth CLI")
         .version("1.0")
@@ -52,5 +59,12 @@ fn main() {
 }
 
 fn parse_address(blockchain: &str, address: &str) {}
-fn generate_message(blockchain: &str, pubkey: &str) {}
+fn generate_message(blockchain: &str, pubkey: &str) {
+    let algorithm_type = AlgorithmType::Bitcoin;
+    let run_type = EntryCategoryType::Exec;
+    let auth = auth_builder(algorithm_type).unwrap();
+    let config = TestConfig::new(&auth, run_type, 1);
+    let mut data_loader = DummyDataLoader::new();
+    let tx = gen_tx(&mut data_loader, &config);
+}
 fn verify_signature(blockchain: &str, pubkey_hash: &str, signature: &str) {}
