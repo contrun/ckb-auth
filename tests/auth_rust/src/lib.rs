@@ -361,6 +361,21 @@ fn append_cells_deps<R: Rng>(
     (dummy_capacity, tx_builder)
 }
 
+pub fn gen_tx_with_pub_key_hash(
+    dummy: &mut DummyDataLoader,
+    config: &TestConfig,
+    hash: Vec<u8>,
+) -> TransactionView {
+    let lock_args = gen_args_with_pub_key_hash(&config, hash);
+
+    let mut rng = thread_rng();
+    gen_tx_with_grouped_args(
+        dummy,
+        vec![(lock_args, config.sign_size as usize)],
+        &mut rng,
+    )
+}
+
 pub fn gen_tx(dummy: &mut DummyDataLoader, config: &TestConfig) -> TransactionView {
     let lock_args = gen_args(&config);
 
@@ -490,6 +505,14 @@ impl TestConfig {
 }
 
 pub fn gen_args(config: &TestConfig) -> Bytes {
+    do_gen_args(config, None)
+}
+
+pub fn gen_args_with_pub_key_hash(config: &TestConfig, pub_key_hash: Vec<u8>) -> Bytes {
+    do_gen_args(config, Some(pub_key_hash))
+}
+
+pub fn do_gen_args(config: &TestConfig, pub_key_hash: Option<Vec<u8>>) -> Bytes {
     let mut ckb_auth_type = CkbAuthType {
         algorithm_id: config.auth.get_algorithm_type(),
         content: [0; 20],
@@ -502,7 +525,7 @@ pub fn gen_args(config: &TestConfig) -> Bytes {
     };
 
     if !config.incorrect_pubkey {
-        let pub_hash = config.auth.get_pub_key_hash();
+        let pub_hash = pub_key_hash.unwrap_or(config.auth.get_pub_key_hash());
         assert_eq!(pub_hash.len(), 20);
         ckb_auth_type.content.copy_from_slice(pub_hash.as_slice());
     } else {

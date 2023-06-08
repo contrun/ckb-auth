@@ -2,15 +2,16 @@ use anyhow::{anyhow, Error};
 use clap::{arg, Command};
 
 use ckb_auth_rs::{
-    auth_builder, build_resolved_tx, debug_printer, gen_tx, get_message_to_sign, set_signature,
-    AlgorithmType, DummyDataLoader, EntryCategoryType, TestConfig, MAX_CYCLES,
+    auth_builder, build_resolved_tx, debug_printer, gen_tx, gen_tx_with_pub_key_hash,
+    get_message_to_sign, set_signature, AlgorithmType, DummyDataLoader, EntryCategoryType,
+    TestConfig, MAX_CYCLES,
 };
 
 use ckb_script::TransactionScriptsVerifier;
 use ckb_types::bytes::Bytes;
 use std::sync::Arc;
 
-fn main() {
+fn main() -> Result<(), Error> {
     let matches = Command::new("CKB-Auth CLI")
         .version("1.0")
         .author("Your Name")
@@ -22,18 +23,21 @@ fn main() {
             Command::new("parse")
                 .about("Parse an address and obtain the pubkey hash")
                 .arg_required_else_help(true)
-                .arg(arg!(-a --address <ADDRESS> "the address to pass")),
+                .arg(arg!(-a --address <ADDRESS> "The address to parse")),
         )
         .subcommand(
             Command::new("generate")
                 .about("Generate a message to be signed")
                 .arg_required_else_help(true)
-                .arg(arg!(-p --pubkey <PUBKEY> "the pubkey to include in the message")),
+                .arg(arg!(-a --address <ADDRESS> "The pubkey address whose hash will be included in the message").required(false))
+                .arg(arg!(-p --pubkeyhash <PUBKEYHASH> "The pubkey hash to include in the message").required(false))
+                .arg(arg!(-t --txfile <TXFILE> "The signature to verify")),
         )
         .subcommand(
             Command::new("verify")
                 .about("Verify a signature")
                 .arg_required_else_help(true)
+                .arg(arg!(-a --address <ADDRESS> "The pubkey address whose hash verify against"))
                 .arg(arg!(-p --pubkeyhash <PUBKEYHASH> "The pubkey hash to verify against"))
                 .arg(arg!(-s --signature <SIGNATURE> "The signature to verify")),
         )
@@ -45,23 +49,58 @@ fn main() {
         Some(("parse", parse_matches)) => {
             let address = parse_matches.get_one::<String>("address").unwrap();
             parse_address(blockchain, address);
+            Ok(())
         }
         Some(("generate", generate_matches)) => {
-            let pubkey = generate_matches.get_one::<String>("pubkey").unwrap();
-            generate_message(blockchain, pubkey);
+            let address = generate_matches
+                .get_one::<String>("address");
+            let pubkeyhash = generate_matches
+                .get_one::<String>("pubkeyhash");
+            let pubkeyhash = get_pub_key_hash(
+                blockchain,
+                address.as_ref().map(|x| x.as_str()),
+                pubkeyhash.as_ref().map(|x| x.as_str()),
+            )?;
+            generate_message(blockchain, pubkeyhash);
+            Ok(())
         }
         Some(("verify", verify_matches)) => {
-            let pubkey_hash = verify_matches.get_one::<String>("pubkeyhash").unwrap();
-            let signature = verify_matches.get_one::<String>("signature").unwrap();
-            verify_signature(blockchain, pubkey_hash, signature);
+            let address = verify_matches
+                .get_one::<String>("address");
+            let pubkeyhash = verify_matches
+                .get_one::<String>("pubkeyhash");
+            let pubkeyhash = get_pub_key_hash(
+                blockchain,
+                address.as_ref().map(|x| x.as_str()),
+                pubkeyhash.as_ref().map(|x| x.as_str()),
+            )?;
+            let signature = verify_matches
+                .get_one::<String>("signature").unwrap();
+            verify_signature(blockchain, pubkeyhash, signature);
+            Ok(())
         }
         _ => {
+            Err(anyhow!("Unknown subcommand"))
             // Handle invalid or missing subcommands
         }
     }
 }
 
-fn get_pub_key_hash(blockchain: &str, address: &str) -> Result<Vec<u8>, Error> {
+fn get_pub_key_hash(
+    blockchain: &str,
+    address: Option<&str>,
+    pubkeyhash: Option<&str>,
+) -> Result<Vec<u8>, Error> {
+    if pubkeyhash.is_some() {
+        return Ok(hex::decode(pubkeyhash.unwrap())?);
+    }
+    if address.is_none() {
+        return Err(anyhow!("Must pass pubkey or pubkeyhash"));
+    }
+    get_pub_key_hash_from_address(blockchain, address.unwrap())
+}
+
+fn get_pub_key_hash_from_address(blockchain: &str, address: &str) -> Result<Vec<u8>, Error> {
     if blockchain == "litecoin" {
         // base58 -d <<< mhknqLHQGWDXuLsPdzab8nA4jD3fMdVYS2 | xxd -s 1 -l 20 -p
         let bytes = bs58::decode(&address).into_vec()?;
@@ -73,22 +112,22 @@ fn get_pub_key_hash(blockchain: &str, address: &str) -> Result<Vec<u8>, Error> {
 fn parse_address(blockchain: &str, address: &str) {
     println!(
         "{}",
-        hex::encode(get_pub_key_hash(blockchain, address).expect("get pub key hash"))
+        hex::encode(get_pub_key_hash_from_address(blockchain, address).expect("get pub key hash"))
     );
 }
 
-fn generate_message(_blockchain: &str, _pubkey: &str) {
+fn generate_message(_blockchain: &str, pubkeyhash: Vec<u8>) {
     let algorithm_type = AlgorithmType::Bitcoin;
     let run_type = EntryCategoryType::Exec;
     let auth = auth_builder(algorithm_type).unwrap();
     let config = TestConfig::new(&auth, run_type, 1);
     let mut data_loader = DummyDataLoader::new();
-    let tx = gen_tx(&mut data_loader, &config);
+    let tx = gen_tx_with_pub_key_hash(&mut data_loader, &config, pubkeyhash);
     let message_to_sign = get_message_to_sign(tx, &config);
-    dbg!(hex::encode(message_to_sign.as_bytes()));
+    println!("{}", hex::encode(message_to_sign.as_bytes()));
 }
 
-fn verify_signature(_blockchain: &str, _pubkey_hash: &str, _signature: &str) {
+fn verify_signature(_blockchain: &str, _pub_key_hash: Vec<u8>, _signature: &str) {
     let algorithm_type = AlgorithmType::Bitcoin;
     let run_type = EntryCategoryType::Exec;
     let auth = auth_builder(algorithm_type).unwrap();
