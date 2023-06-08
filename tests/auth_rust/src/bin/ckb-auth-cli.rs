@@ -2,7 +2,7 @@ use clap::{arg, Command};
 
 use ckb_auth_rs::{
     auth_builder, build_resolved_tx, debug_printer, gen_tx, get_message_to_sign, set_signature,
-    AlgorithmType, Auth, DummyDataLoader, EntryCategoryType, TestConfig, MAX_CYCLES,
+    AlgorithmType, DummyDataLoader, EntryCategoryType, TestConfig, MAX_CYCLES,
 };
 
 use ckb_script::TransactionScriptsVerifier;
@@ -86,7 +86,7 @@ fn verify_signature(_blockchain: &str, _pubkey_hash: &str, _signature: &str) {
     let mut data_loader = DummyDataLoader::new();
     let tx = gen_tx(&mut data_loader, &config);
     let signature = Bytes::new();
-    let tx = set_signature(tx, &config, &signature);
+    let tx = set_signature(tx, &signature);
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
 
     let mut verifier = TransactionScriptsVerifier::new(Arc::new(resolved_tx), data_loader.clone());

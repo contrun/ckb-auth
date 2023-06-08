@@ -155,21 +155,14 @@ pub fn get_message_to_sign_by_input_group(
         .unwrap()
 }
 
-pub fn set_signature(
-    tx: TransactionView,
-    config: &TestConfig,
-    signature: &Bytes,
-) -> TransactionView {
-    let witnesses_len = tx.witnesses().len();
-    set_signature_by_input_group(tx, config, signature, 0, witnesses_len)
+pub fn set_signature(tx: TransactionView, signature: &Bytes) -> TransactionView {
+    set_signature_by_index(tx, signature, 0)
 }
 
-pub fn set_signature_by_input_group(
+pub fn set_signature_by_index(
     tx: TransactionView,
-    config: &TestConfig,
     signature: &Bytes,
     begin_index: usize,
-    len: usize,
 ) -> TransactionView {
     // We need to pass to ownership of signature to the closure in map below.
     let mut signed_witnesses: Vec<packed::Bytes> = tx
