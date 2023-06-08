@@ -2,7 +2,7 @@ use anyhow::{anyhow, Error};
 use clap::{arg, Command};
 
 use ckb_auth_rs::{
-    auth_builder, build_resolved_tx, debug_printer, gen_tx, gen_tx_with_pub_key_hash,
+    auth_builder, build_resolved_tx, debug_printer, gen_tx_with_pub_key_hash,
     get_message_to_sign, set_signature, AlgorithmType, DummyDataLoader, EntryCategoryType,
     TestConfig, MAX_CYCLES,
 };
@@ -39,6 +39,7 @@ fn main() -> Result<(), Error> {
                 .arg(arg!(-a --address <ADDRESS> "The pubkey address whose hash verify against"))
                 .arg(arg!(-p --pubkeyhash <PUBKEYHASH> "The pubkey hash to verify against"))
                 .arg(arg!(-s --signature <SIGNATURE> "The signature to verify"))
+                .arg(arg!(-e --encoding <ENCODING> "The encoding of the signature (may be hex or base64)"))
         )
         .get_matches();
 
@@ -70,6 +71,11 @@ fn main() -> Result<(), Error> {
                 pubkeyhash.as_ref().map(|x| x.as_str()),
             )?;
             let signature = verify_matches.get_one::<String>("signature").unwrap();
+            let encoding = verify_matches
+                .get_one::<String>("encoding")
+                .map(String::as_str)
+                .unwrap_or("hex");
+            let signature = decode_string(signature, encoding)?;
             verify_signature(blockchain, pubkeyhash, signature);
             Ok(())
         }
@@ -80,6 +86,16 @@ fn main() -> Result<(), Error> {
     }
 }
 
+fn decode_string(s: &str, encoding: &str) -> Result<Vec<u8>, Error> {
+    match encoding {
+        "hex" => Ok(hex::decode(s)?),
+        "base64" => {
+            use base64::{engine::general_purpose, Engine as _};
+            Ok(general_purpose::STANDARD.decode(s)?)
+        }
+        _ => Err(anyhow!("Unknown encoding {}", encoding)),
+    }
+}
 fn get_pub_key_hash(
     blockchain: &str,
     address: Option<&str>,
@@ -121,7 +137,7 @@ fn generate_message(_blockchain: &str, pubkeyhash: Vec<u8>) {
     println!("{}", hex::encode(message_to_sign.as_bytes()));
 }
 
-fn verify_signature(_blockchain: &str, pubkeyhash: Vec<u8>, _signature: &str) {
+fn verify_signature(_blockchain: &str, pubkeyhash: Vec<u8>, _signature: Vec<u8>) {
     let algorithm_type = AlgorithmType::Bitcoin;
     let run_type = EntryCategoryType::Exec;
     let auth = auth_builder(algorithm_type).unwrap();
