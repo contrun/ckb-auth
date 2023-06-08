@@ -1,4 +1,4 @@
-use ckb_crypto::secp::{Generator, Privkey};
+use ckb_crypto::secp::{Generator, Privkey, Pubkey};
 use ckb_error::Error;
 use ckb_traits::{CellDataProvider, HeaderProvider};
 use ckb_types::{
@@ -854,6 +854,9 @@ impl Auth for TronAuth {
 #[derive(Clone)]
 pub struct BitcoinAuth {
     pub privkey: Privkey,
+    // We use this pubkey in operations like get_pub_key_hash.
+    // Pubkey may be inconsistent with private key.
+    pub pubkey: Option<Pubkey>,
     pub compress: bool,
 }
 impl BitcoinAuth {
@@ -861,13 +864,21 @@ impl BitcoinAuth {
         let privkey = Generator::random_privkey();
         Box::new(BitcoinAuth {
             privkey,
+            pubkey: None,
             compress: true,
         })
     }
-    pub fn get_btc_pub_key_hash(privkey: &Privkey, compress: bool) -> Vec<u8> {
+    pub fn new_with_public_key(pubkey: Pubkey) -> Box<BitcoinAuth> {
+        let privkey = Generator::random_privkey();
+        Box::new(BitcoinAuth {
+            privkey,
+            pubkey: Some(pubkey),
+            compress: true,
+        })
+    }
+    pub fn get_btc_pub_key_hash(pub_key: &Pubkey, compress: bool) -> Vec<u8> {
         use mbedtls::hash::{Md, Type};
 
-        let pub_key = privkey.pubkey().expect("pubkey");
         let pub_key_vec: Vec<u8>;
         if compress {
             pub_key_vec = pub_key.serialize();
@@ -917,7 +928,11 @@ impl BitcoinAuth {
 }
 impl Auth for BitcoinAuth {
     fn get_pub_key_hash(&self) -> Vec<u8> {
-        BitcoinAuth::get_btc_pub_key_hash(&self.privkey, self.compress)
+        let pub_key = self
+            .pubkey
+            .clone()
+            .unwrap_or(self.privkey.pubkey().expect("pubkey"));
+        BitcoinAuth::get_btc_pub_key_hash(&pub_key, self.compress)
     }
     fn get_algorithm_type(&self) -> u8 {
         AlgorithmType::Bitcoin as u8
@@ -946,7 +961,8 @@ impl DogecoinAuth {
 }
 impl Auth for DogecoinAuth {
     fn get_pub_key_hash(&self) -> Vec<u8> {
-        BitcoinAuth::get_btc_pub_key_hash(&self.privkey, self.compress)
+        let pub_key = self.privkey.pubkey().expect("pubkey");
+        BitcoinAuth::get_btc_pub_key_hash(&pub_key, self.compress)
     }
     fn get_algorithm_type(&self) -> u8 {
         AlgorithmType::Dogecoin as u8

@@ -79,6 +79,7 @@ fn generate_message(blockchain: &str, pubkey: &str) {
     let message_to_sign = get_message_to_sign(tx, &config);
     dbg!(hex::encode(message_to_sign.as_bytes()));
 }
+
 fn verify_signature(blockchain: &str, pubkey_hash: &str, signature: &str) {
     let algorithm_type = AlgorithmType::Bitcoin;
     let run_type = EntryCategoryType::Exec;
