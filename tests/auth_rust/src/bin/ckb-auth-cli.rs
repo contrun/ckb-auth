@@ -1,14 +1,12 @@
-use clap::{arg, Arg, Command};
+use clap::{arg, Command};
 
 use ckb_auth_rs::{
-    assert_script_error, auth_builder, build_resolved_tx, debug_printer, gen_args, gen_tx,
-    gen_tx_with_grouped_args, get_message_to_sign, set_signature, sign_tx, AlgorithmType, Auth,
-    AuthErrorCodeType, BitcoinAuth, CKbAuth, CkbMultisigAuth, DogecoinAuth, DummyDataLoader,
-    EntryCategoryType, EosAuth, EthereumAuth, SchnorrAuth, TestConfig, TronAuth, MAX_CYCLES,
+    auth_builder, build_resolved_tx, debug_printer, gen_tx, get_message_to_sign, set_signature,
+    AlgorithmType, Auth, DummyDataLoader, EntryCategoryType, TestConfig, MAX_CYCLES,
 };
 
 use ckb_script::TransactionScriptsVerifier;
-use ckb_types::bytes::{BufMut, Bytes, BytesMut};
+use ckb_types::bytes::Bytes;
 use std::sync::Arc;
 
 fn main() {
@@ -45,16 +43,16 @@ fn main() {
     match matches.subcommand() {
         Some(("parse", parse_matches)) => {
             let address = parse_matches.get_one::<String>("address").unwrap();
-            parse_address(&blockchain, &address);
+            parse_address(blockchain, address);
         }
         Some(("generate", generate_matches)) => {
             let pubkey = generate_matches.get_one::<String>("pubkey").unwrap();
-            generate_message(&blockchain, &pubkey);
+            generate_message(blockchain, pubkey);
         }
         Some(("verify", verify_matches)) => {
             let pubkey_hash = verify_matches.get_one::<String>("pubkeyhash").unwrap();
             let signature = verify_matches.get_one::<String>("signature").unwrap();
-            verify_signature(&blockchain, &pubkey_hash, &signature);
+            verify_signature(blockchain, pubkey_hash, signature);
         }
         _ => {
             // Handle invalid or missing subcommands
@@ -62,14 +60,14 @@ fn main() {
     }
 }
 
-fn parse_address(blockchain: &str, address: &str) {
+fn parse_address(_blockchain: &str, _address: &str) {
     let algorithm_type = AlgorithmType::Bitcoin;
-    let run_type = EntryCategoryType::Exec;
+    let _run_type = EntryCategoryType::Exec;
     let auth = auth_builder(algorithm_type).unwrap();
     dbg!(hex::encode(auth.get_pub_key_hash()));
 }
 
-fn generate_message(blockchain: &str, pubkey: &str) {
+fn generate_message(_blockchain: &str, _pubkey: &str) {
     let algorithm_type = AlgorithmType::Bitcoin;
     let run_type = EntryCategoryType::Exec;
     let auth = auth_builder(algorithm_type).unwrap();
@@ -80,7 +78,7 @@ fn generate_message(blockchain: &str, pubkey: &str) {
     dbg!(hex::encode(message_to_sign.as_bytes()));
 }
 
-fn verify_signature(blockchain: &str, pubkey_hash: &str, signature: &str) {
+fn verify_signature(_blockchain: &str, _pubkey_hash: &str, _signature: &str) {
     let algorithm_type = AlgorithmType::Bitcoin;
     let run_type = EntryCategoryType::Exec;
     let auth = auth_builder(algorithm_type).unwrap();
