@@ -1,15 +1,16 @@
-use anyhow::{anyhow, Error};
-use clap::{arg, Command};
 
 use ckb_auth_rs::{
-    auth_builder, build_resolved_tx, debug_printer, gen_tx_with_pub_key_hash,
-    get_message_to_sign, set_signature, AlgorithmType, DummyDataLoader, EntryCategoryType,
-    TestConfig, MAX_CYCLES,
+    auth_builder, build_resolved_tx, debug_printer, gen_tx_with_pub_key_hash, get_message_to_sign,
+    set_signature, AlgorithmType, DummyDataLoader, EntryCategoryType, TestConfig, MAX_CYCLES,
 };
 
 use ckb_script::TransactionScriptsVerifier;
-use ckb_types::bytes::Bytes;
+
 use std::sync::Arc;
+
+use anyhow::{anyhow, Error};
+use clap::{arg, Command};
+
 
 fn main() -> Result<(), Error> {
     let matches = Command::new("CKB-Auth CLI")
@@ -137,18 +138,22 @@ fn generate_message(_blockchain: &str, pubkeyhash: Vec<u8>) {
     println!("{}", hex::encode(message_to_sign.as_bytes()));
 }
 
-fn verify_signature(_blockchain: &str, pubkeyhash: Vec<u8>, _signature: Vec<u8>) {
+fn verify_signature(_blockchain: &str, pubkeyhash: Vec<u8>, signature: Vec<u8>) {
     let algorithm_type = AlgorithmType::Bitcoin;
     let run_type = EntryCategoryType::Exec;
     let auth = auth_builder(algorithm_type).unwrap();
     let config = TestConfig::new(&auth, run_type, 1);
     let mut data_loader = DummyDataLoader::new();
     let tx = gen_tx_with_pub_key_hash(&mut data_loader, &config, pubkeyhash);
-    let signature = Bytes::new();
+    let signature = signature.into();
     let tx = set_signature(tx, &signature);
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
 
     let mut verifier = TransactionScriptsVerifier::new(Arc::new(resolved_tx), data_loader.clone());
     verifier.set_debug_printer(debug_printer);
-    assert!(verifier.verify(MAX_CYCLES).is_ok());
+    let result = verifier.verify(MAX_CYCLES);
+    if result.is_err() {
+        dbg!(result.unwrap_err());
+        panic!("Verification failed");
+    }
 }
