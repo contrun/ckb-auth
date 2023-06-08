@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Error};
 use clap::{arg, Command};
 
 use ckb_auth_rs::{
@@ -60,11 +61,20 @@ fn main() {
     }
 }
 
-fn parse_address(_blockchain: &str, _address: &str) {
-    let algorithm_type = AlgorithmType::Bitcoin;
-    let _run_type = EntryCategoryType::Exec;
-    let auth = auth_builder(algorithm_type).unwrap();
-    dbg!(hex::encode(auth.get_pub_key_hash()));
+fn get_pub_key_hash(blockchain: &str, address: &str) -> Result<Vec<u8>, Error> {
+    if blockchain == "litecoin" {
+        // base58 -d <<< mhknqLHQGWDXuLsPdzab8nA4jD3fMdVYS2 | xxd -s 1 -l 20 -p
+        let bytes = bs58::decode(&address).into_vec()?;
+        return Ok(bytes[1..21].into());
+    }
+    Err(anyhow!("Unknown blockchain: {}", blockchain))
+}
+
+fn parse_address(blockchain: &str, address: &str) {
+    println!(
+        "{}",
+        hex::encode(get_pub_key_hash(blockchain, address).expect("get pub key hash"))
+    );
 }
 
 fn generate_message(_blockchain: &str, _pubkey: &str) {
