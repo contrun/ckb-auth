@@ -31,7 +31,6 @@ fn main() -> Result<(), Error> {
                 .arg_required_else_help(true)
                 .arg(arg!(-a --address <ADDRESS> "The pubkey address whose hash will be included in the message").required(false))
                 .arg(arg!(-p --pubkeyhash <PUBKEYHASH> "The pubkey hash to include in the message").required(false))
-                .arg(arg!(-t --txfile <TXFILE> "The signature to verify")),
         )
         .subcommand(
             Command::new("verify")
@@ -39,7 +38,7 @@ fn main() -> Result<(), Error> {
                 .arg_required_else_help(true)
                 .arg(arg!(-a --address <ADDRESS> "The pubkey address whose hash verify against"))
                 .arg(arg!(-p --pubkeyhash <PUBKEYHASH> "The pubkey hash to verify against"))
-                .arg(arg!(-s --signature <SIGNATURE> "The signature to verify")),
+                .arg(arg!(-s --signature <SIGNATURE> "The signature to verify"))
         )
         .get_matches();
 
@@ -52,10 +51,8 @@ fn main() -> Result<(), Error> {
             Ok(())
         }
         Some(("generate", generate_matches)) => {
-            let address = generate_matches
-                .get_one::<String>("address");
-            let pubkeyhash = generate_matches
-                .get_one::<String>("pubkeyhash");
+            let address = generate_matches.get_one::<String>("address");
+            let pubkeyhash = generate_matches.get_one::<String>("pubkeyhash");
             let pubkeyhash = get_pub_key_hash(
                 blockchain,
                 address.as_ref().map(|x| x.as_str()),
@@ -65,17 +62,14 @@ fn main() -> Result<(), Error> {
             Ok(())
         }
         Some(("verify", verify_matches)) => {
-            let address = verify_matches
-                .get_one::<String>("address");
-            let pubkeyhash = verify_matches
-                .get_one::<String>("pubkeyhash");
+            let address = verify_matches.get_one::<String>("address");
+            let pubkeyhash = verify_matches.get_one::<String>("pubkeyhash");
             let pubkeyhash = get_pub_key_hash(
                 blockchain,
                 address.as_ref().map(|x| x.as_str()),
                 pubkeyhash.as_ref().map(|x| x.as_str()),
             )?;
-            let signature = verify_matches
-                .get_one::<String>("signature").unwrap();
+            let signature = verify_matches.get_one::<String>("signature").unwrap();
             verify_signature(blockchain, pubkeyhash, signature);
             Ok(())
         }
@@ -127,13 +121,13 @@ fn generate_message(_blockchain: &str, pubkeyhash: Vec<u8>) {
     println!("{}", hex::encode(message_to_sign.as_bytes()));
 }
 
-fn verify_signature(_blockchain: &str, _pub_key_hash: Vec<u8>, _signature: &str) {
+fn verify_signature(_blockchain: &str, pubkeyhash: Vec<u8>, _signature: &str) {
     let algorithm_type = AlgorithmType::Bitcoin;
     let run_type = EntryCategoryType::Exec;
     let auth = auth_builder(algorithm_type).unwrap();
     let config = TestConfig::new(&auth, run_type, 1);
     let mut data_loader = DummyDataLoader::new();
-    let tx = gen_tx(&mut data_loader, &config);
+    let tx = gen_tx_with_pub_key_hash(&mut data_loader, &config, pubkeyhash);
     let signature = Bytes::new();
     let tx = set_signature(tx, &signature);
     let resolved_tx = build_resolved_tx(&data_loader, &tx);

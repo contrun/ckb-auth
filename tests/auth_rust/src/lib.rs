@@ -28,6 +28,7 @@ mod tests;
 
 pub const MAX_CYCLES: u64 = std::u64::MAX;
 pub const SIGNATURE_SIZE: usize = 65;
+pub const RNG_SEED: u64 = 42;
 
 lazy_static! {
     pub static ref AUTH_DEMO: Bytes = Bytes::from(&include_bytes!("../../../build/auth_demo")[..]);
@@ -367,8 +368,8 @@ pub fn gen_tx_with_pub_key_hash(
     hash: Vec<u8>,
 ) -> TransactionView {
     let lock_args = gen_args_with_pub_key_hash(&config, hash);
+    let mut rng: rand::rngs::SmallRng = rand::SeedableRng::seed_from_u64(RNG_SEED);
 
-    let mut rng = thread_rng();
     gen_tx_with_grouped_args(
         dummy,
         vec![(lock_args, config.sign_size as usize)],
