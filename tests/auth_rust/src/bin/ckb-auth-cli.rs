@@ -135,7 +135,13 @@ fn get_algorithm_type(blockchain: &str) -> Result<AlgorithmType, Error> {
 fn generate_message(blockchain: &str, pubkeyhash: Vec<u8>) {
     let algorithm_type = get_algorithm_type(blockchain).unwrap();
     let run_type = EntryCategoryType::Exec;
-    let auth = auth_builder(algorithm_type, false).unwrap();
+    // Note that we must set the official parameter of auth_builder to be true here.
+    // The difference between official=true and official=false is that the later
+    // convert the message to a form that can be signed directly with secp256k1.
+    // This is not intended as the litecoin-cli will do the conversion internally,
+    // and then sign the converted message. With official set to be true, we don't
+    // do this kind of conversion in the auth data structure.
+    let auth = auth_builder(algorithm_type, true).unwrap();
     let config = TestConfig::new(&auth, run_type, 1);
     let mut data_loader = DummyDataLoader::new();
     let tx = gen_tx_with_pub_key_hash(&mut data_loader, &config, pubkeyhash);
