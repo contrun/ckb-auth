@@ -1,4 +1,3 @@
-
 use ckb_auth_rs::{
     auth_builder, build_resolved_tx, debug_printer, gen_tx_with_pub_key_hash, get_message_to_sign,
     set_signature, AlgorithmType, DummyDataLoader, EntryCategoryType, TestConfig, MAX_CYCLES,
@@ -10,7 +9,6 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Error};
 use clap::{arg, Command};
-
 
 fn main() -> Result<(), Error> {
     let matches = Command::new("CKB-Auth CLI")
@@ -130,7 +128,7 @@ fn parse_address(blockchain: &str, address: &str) {
 fn generate_message(_blockchain: &str, pubkeyhash: Vec<u8>) {
     let algorithm_type = AlgorithmType::Bitcoin;
     let run_type = EntryCategoryType::Exec;
-    let auth = auth_builder(algorithm_type).unwrap();
+    let auth = auth_builder(algorithm_type, false).unwrap();
     let config = TestConfig::new(&auth, run_type, 1);
     let mut data_loader = DummyDataLoader::new();
     let tx = gen_tx_with_pub_key_hash(&mut data_loader, &config, pubkeyhash);
@@ -141,7 +139,7 @@ fn generate_message(_blockchain: &str, pubkeyhash: Vec<u8>) {
 fn verify_signature(_blockchain: &str, pubkeyhash: Vec<u8>, signature: Vec<u8>) {
     let algorithm_type = AlgorithmType::Bitcoin;
     let run_type = EntryCategoryType::Exec;
-    let auth = auth_builder(algorithm_type).unwrap();
+    let auth = auth_builder(algorithm_type, false).unwrap();
     let config = TestConfig::new(&auth, run_type, 1);
     let mut data_loader = DummyDataLoader::new();
     let tx = gen_tx_with_pub_key_hash(&mut data_loader, &config, pubkeyhash);
