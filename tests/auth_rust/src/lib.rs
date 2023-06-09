@@ -177,7 +177,6 @@ pub fn set_signature_by_index(
             if i == begin_index {
                 let witness =
                     WitnessArgs::new_unchecked(tx.witnesses().get(i).unwrap_or_default().unpack());
-                dbg!(hex::encode(signature));
                 witness
                     .as_builder()
                     .lock(Some(signature.clone()).pack())
@@ -192,7 +191,6 @@ pub fn set_signature_by_index(
     for i in signed_witnesses.len()..tx.witnesses().len() {
         signed_witnesses.push(tx.witnesses().get(i).unwrap());
     }
-    dbg!(&signed_witnesses);
     // calculate message
     tx.as_advanced_builder()
         .set_witnesses(signed_witnesses)
@@ -904,11 +902,6 @@ impl BitcoinAuth {
             pub_key_vec = temp.freeze().to_vec();
         }
 
-        dbg!(
-            hex::encode(pub_key.serialize()),
-            hex::encode(pub_key.as_bytes()),
-            hex::encode(&pub_key_vec)
-        );
         let pub_hash = calculate_sha256(&pub_key_vec);
 
         let mut msg = [0u8; 20];
@@ -1025,8 +1018,6 @@ impl LitecoinAuth {
         let sk = bitcoin::secp256k1::SecretKey::from_slice(privkey_bytes).unwrap();
         let sk = sk.secret_bytes();
 
-        dbg!(hex::encode(&sk));
-
         Box::new(LitecoinAuth {
             official: false,
             sk,
@@ -1050,7 +1041,6 @@ impl LitecoinAuth {
 impl Auth for LitecoinAuth {
     fn get_pub_key_hash(&self) -> Vec<u8> {
         let hash = BitcoinAuth::get_btc_pub_key_hash(&self.get_privkey(), self.compress);
-        dbg!(hex::encode(&hash));
         hash
     }
     fn get_algorithm_type(&self) -> u8 {

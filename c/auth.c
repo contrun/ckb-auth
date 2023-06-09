@@ -1,5 +1,3 @@
-#include "dump.c"
-
 // clang-format off
 #include "mbedtls/md.h"
 #include "mbedtls/md_internal.h"
@@ -274,25 +272,18 @@ int validate_signature_btc(void *prefilled_data, const uint8_t *sig,
                                         &out_pubkey_size, false);
     CHECK(err);
 
-    hex_dump("sig", sig, sig_len, 0);
-    hex_dump("msg", msg, msg_len, 0);
-    hex_dump("out_pubkey", out_pubkey, out_pubkey_size, 0);
     const mbedtls_md_info_t *md_info =
         mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
     unsigned char temp[SHA256_SIZE];
     err = md_string(md_info, out_pubkey, out_pubkey_size, temp);
     CHECK(err);
-    hex_dump("out_pubkey sha256", temp, SHA256_SIZE, 0);
 
     md_info = mbedtls_md_info_from_type(MBEDTLS_MD_RIPEMD160);
     err = md_string(md_info, temp, SHA256_SIZE, temp);
     CHECK(err);
-    hex_dump("out_pubkey sha256 ripemd160", temp, SHA256_SIZE, 0);
-    hex_dump("out_pubkey sha256 ripemd160", temp, RIPEMD160_SIZE, 0);
 
     memcpy(output, temp, BLAKE160_SIZE);
     *output_len = BLAKE160_SIZE;
-    hex_dump("output buffer", output, *output_len, 0);
 
 exit:
     return err;
@@ -431,6 +422,7 @@ int convert_btc_message_variant(const uint8_t *msg, size_t msg_len,
     uint8_t temp[MESSAGE_HEX_LEN];
     bin_to_hex(msg, temp, 32);
 
+
     // len of magic + magic string + len of message, size is 26 Byte
     uint8_t new_magic[magic_len + 2];
     new_magic[0] = magic_len;  // MESSAGE_MAGIC length
@@ -475,10 +467,8 @@ const int8_t LITE_MAGIC_LEN = 25;
 
 int convert_litecoin_message(const uint8_t *msg, size_t msg_len,
                              uint8_t *new_msg, size_t new_msg_len) {
-    hex_dump(__func__, msg, msg_len, 0);
     int ret =  convert_btc_message_variant(msg, msg_len, new_msg, new_msg_len,
                                        LITE_MESSAGE_MAGIC, LITE_MAGIC_LEN);
-    hex_dump(__func__, new_msg, new_msg_len, 0);
     return ret;
 }
 
@@ -524,8 +514,6 @@ static int verify(uint8_t *pubkey_hash, const uint8_t *sig, uint32_t sig_len,
                &output_len);
     CHECK(err);
 
-    hex_dump("pubkey_hash", pubkey_hash, BLAKE160_SIZE, 0);
-    hex_dump("output_pubkey_hash", output_pubkey_hash, BLAKE160_SIZE, 0);
     int same = memcmp(pubkey_hash, output_pubkey_hash, BLAKE160_SIZE);
     CHECK2(same == 0, ERROR_MISMATCHED);
 
