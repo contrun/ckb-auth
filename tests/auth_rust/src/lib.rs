@@ -174,6 +174,7 @@ pub fn set_signature_by_index(
             if i == begin_index {
                 let witness =
                     WitnessArgs::new_unchecked(tx.witnesses().get(i).unwrap_or_default().unpack());
+                dbg!(hex::encode(signature));
                 witness
                     .as_builder()
                     .lock(Some(signature.clone()).pack())
@@ -188,6 +189,7 @@ pub fn set_signature_by_index(
     for i in signed_witnesses.len()..tx.witnesses().len() {
         signed_witnesses.push(tx.witnesses().get(i).unwrap());
     }
+    dbg!(&signed_witnesses);
     // calculate message
     tx.as_advanced_builder()
         .set_witnesses(signed_witnesses)

@@ -1,3 +1,4 @@
+#include "dump.c"
 
 // clang-format off
 #include "mbedtls/md.h"
@@ -262,6 +263,7 @@ int validate_signature_eth(void *prefilled_data, const uint8_t *sig,
 int validate_signature_btc(void *prefilled_data, const uint8_t *sig,
                            size_t sig_len, const uint8_t *msg, size_t msg_len,
                            uint8_t *output, size_t *output_len) {
+    printf("%s: hello world\n", __func__);
     int err = 0;
     if (*output_len < BLAKE160_SIZE) {
         return SECP256K1_PUBKEY_SIZE;
@@ -272,18 +274,25 @@ int validate_signature_btc(void *prefilled_data, const uint8_t *sig,
                                         &out_pubkey_size, false);
     CHECK(err);
 
+    hex_dump("sig", sig, sig_len, 0);
+    hex_dump("msg", msg, msg_len, 0);
+    hex_dump("out_pubkey", out_pubkey, out_pubkey_size, 0);
     const mbedtls_md_info_t *md_info =
         mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
     unsigned char temp[SHA256_SIZE];
     err = md_string(md_info, out_pubkey, out_pubkey_size, temp);
     CHECK(err);
+    hex_dump("out_pubkey sha256", temp, SHA256_SIZE, 0);
 
     md_info = mbedtls_md_info_from_type(MBEDTLS_MD_RIPEMD160);
     err = md_string(md_info, temp, SHA256_SIZE, temp);
     CHECK(err);
+    hex_dump("out_pubkey sha256 ripemd160", temp, SHA256_SIZE, 0);
+    hex_dump("out_pubkey sha256 ripemd160", temp, RIPEMD160_SIZE, 0);
 
     memcpy(output, temp, BLAKE160_SIZE);
     *output_len = BLAKE160_SIZE;
+    hex_dump("output buffer", output, *output_len, 0);
 
 exit:
     return err;
@@ -466,8 +475,11 @@ const int8_t LITE_MAGIC_LEN = 25;
 
 int convert_litecoin_message(const uint8_t *msg, size_t msg_len,
                              uint8_t *new_msg, size_t new_msg_len) {
-    return convert_btc_message_variant(msg, msg_len, new_msg, new_msg_len,
+    hex_dump(__func__, msg, msg_len, 0);
+    int ret =  convert_btc_message_variant(msg, msg_len, new_msg, new_msg_len,
                                        LITE_MESSAGE_MAGIC, LITE_MAGIC_LEN);
+    hex_dump(__func__, new_msg, new_msg_len, 0);
+    return ret;
 }
 
 bool is_lock_script_hash_present(uint8_t *lock_script_hash) {
@@ -512,6 +524,8 @@ static int verify(uint8_t *pubkey_hash, const uint8_t *sig, uint32_t sig_len,
                &output_len);
     CHECK(err);
 
+    hex_dump("pubkey_hash", pubkey_hash, BLAKE160_SIZE, 0);
+    hex_dump("output_pubkey_hash", output_pubkey_hash, BLAKE160_SIZE, 0);
     int same = memcmp(pubkey_hash, output_pubkey_hash, BLAKE160_SIZE);
     CHECK2(same == 0, ERROR_MISMATCHED);
 
@@ -681,6 +695,7 @@ __attribute__((visibility("default"))) int ckb_auth_validate(
     CHECK2(message_size > 0, ERROR_INVALID_ARG);
     CHECK2(pubkey_hash_size == BLAKE160_SIZE, ERROR_INVALID_ARG);
 
+    printf("%s: hello world\n", __func__);
     if (auth_algorithm_id == AuthAlgorithmIdCkb) {
         CHECK2(signature_size == SECP256K1_SIGNATURE_SIZE, ERROR_INVALID_ARG);
         err = verify(pubkey_hash, signature, signature_size, message,
@@ -712,6 +727,7 @@ __attribute__((visibility("default"))) int ckb_auth_validate(
                    message_size, validate_signature_btc, convert_doge_message);
         CHECK(err);
     } else if (auth_algorithm_id == AuthAlgorithmIdLitecoin) {
+        printf("%s: hello world\n", __func__);
         err = verify(pubkey_hash, signature, signature_size, message,
                      message_size, validate_signature_btc,
                      convert_litecoin_message);
@@ -811,6 +827,7 @@ int main(int argc, char *argv[]) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Warray-bounds"
 #endif
+    printf("%s: hello world\n", __func__);
     uint64_t *phoff = (uint64_t *)OFFSETOF(Elf64_Ehdr, e_phoff);
     uint16_t *phnum = (uint16_t *)OFFSETOF(Elf64_Ehdr, e_phnum);
     Elf64_Phdr *program_headers = (Elf64_Phdr *)(*phoff);
@@ -883,6 +900,8 @@ int main(int argc, char *argv[]) {
             entries[entry_index].has_auth_algorithm_id = true;
         } else if ((param_index - 2) % 4 == 1) {
             // signature
+            printf("%s: hello world\n", __func__);
+            printf("%s: param_len %d\n", __func__, param_len);
             CHECK2(param_len > 0, ERROR_EXEC_INVALID_SIG);
             entry_index = (param_index - 2) / 4;
             CHECK2(entry_index < MAX_ENTRY_SIZE, CKB_INDEX_OUT_OF_BOUND);
@@ -915,6 +934,7 @@ int main(int argc, char *argv[]) {
     CHECK2(entries[entry_index].sig_len > 0, ERROR_EXEC_NOT_PAIRED);
     CHECK2(entries[entry_index].pubkey_hash_len > 0, ERROR_EXEC_NOT_PAIRED);
     CHECK2(entries[entry_index].msg_len > 0, ERROR_EXEC_NOT_PAIRED);
+    printf("%s: hello world\n", __func__);
 
     for (size_t i = 0; i <= entry_index; i++) {
         ValidationEntry *entry = entries + i;
