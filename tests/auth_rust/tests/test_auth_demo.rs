@@ -295,6 +295,14 @@ fn litecoin_verify_official() {
 }
 
 #[test]
+fn litecoin_verify_one() {
+    let algorithm_type = AlgorithmType::Litecoin;
+    let auth = auth_builder(algorithm_type, false).unwrap();
+    let run_type = EntryCategoryType::Exec;
+    unit_test_success(&auth, run_type);
+}
+
+#[test]
 fn convert_eth_error() {
     #[derive(Clone)]
     struct EthConverFaileAuth(EthereumAuth);
