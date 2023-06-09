@@ -1,4 +1,3 @@
-
 use ckb_auth_rs::{
     auth_builder, build_resolved_tx, debug_printer, gen_tx_with_pub_key_hash, get_message_to_sign,
     set_signature, AlgorithmType, DummyDataLoader, EntryCategoryType, TestConfig, MAX_CYCLES,
@@ -10,7 +9,6 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Error};
 use clap::{arg, Command};
-
 
 fn main() -> Result<(), Error> {
     let matches = Command::new("CKB-Auth CLI")
@@ -127,10 +125,23 @@ fn parse_address(blockchain: &str, address: &str) {
     );
 }
 
-fn generate_message(_blockchain: &str, pubkeyhash: Vec<u8>) {
-    let algorithm_type = AlgorithmType::Bitcoin;
+fn get_algorithm_type(blockchain: &str) -> Result<AlgorithmType, Error> {
+    match blockchain {
+        "litecoin" => Ok(AlgorithmType::Litecoin),
+        _ => Err(anyhow!("Unknown blochain: {}", blockchain)),
+    }
+}
+
+fn generate_message(blockchain: &str, pubkeyhash: Vec<u8>) {
+    let algorithm_type = get_algorithm_type(blockchain).unwrap();
     let run_type = EntryCategoryType::Exec;
-    let auth = auth_builder(algorithm_type).unwrap();
+    // Note that we must set the official parameter of auth_builder to be true here.
+    // The difference between official=true and official=false is that the later
+    // convert the message to a form that can be signed directly with secp256k1.
+    // This is not intended as the litecoin-cli will do the conversion internally,
+    // and then sign the converted message. With official set to be true, we don't
+    // do this kind of conversion in the auth data structure.
+    let auth = auth_builder(algorithm_type, true).unwrap();
     let config = TestConfig::new(&auth, run_type, 1);
     let mut data_loader = DummyDataLoader::new();
     let tx = gen_tx_with_pub_key_hash(&mut data_loader, &config, pubkeyhash);
@@ -138,10 +149,10 @@ fn generate_message(_blockchain: &str, pubkeyhash: Vec<u8>) {
     println!("{}", hex::encode(message_to_sign.as_bytes()));
 }
 
-fn verify_signature(_blockchain: &str, pubkeyhash: Vec<u8>, signature: Vec<u8>) {
-    let algorithm_type = AlgorithmType::Bitcoin;
+fn verify_signature(blockchain: &str, pubkeyhash: Vec<u8>, signature: Vec<u8>) {
+    let algorithm_type = get_algorithm_type(blockchain).unwrap();
     let run_type = EntryCategoryType::Exec;
-    let auth = auth_builder(algorithm_type).unwrap();
+    let auth = auth_builder(algorithm_type, false).unwrap();
     let config = TestConfig::new(&auth, run_type, 1);
     let mut data_loader = DummyDataLoader::new();
     let tx = gen_tx_with_pub_key_hash(&mut data_loader, &config, pubkeyhash);
