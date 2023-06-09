@@ -203,7 +203,7 @@ pub fn sign_tx_by_input_group(
     begin_index: usize,
     len: usize,
 ) -> TransactionView {
-    let mut rng: rand::rngs::SmallRng = rand::SeedableRng::seed_from_u64(RNG_SEED);
+    let mut rng = thread_rng();
     let tx_hash = tx.hash();
     let mut signed_witnesses: Vec<packed::Bytes> = tx
         .inputs()
@@ -383,7 +383,7 @@ pub fn gen_tx_with_pub_key_hash(
 pub fn gen_tx(dummy: &mut DummyDataLoader, config: &TestConfig) -> TransactionView {
     let lock_args = gen_args(&config);
 
-    let mut rng: rand::rngs::SmallRng = rand::SeedableRng::seed_from_u64(RNG_SEED);
+    let mut rng = thread_rng();
     gen_tx_with_grouped_args(
         dummy,
         vec![(lock_args, config.sign_size as usize)],
