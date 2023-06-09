@@ -792,6 +792,11 @@ impl BitcoinAuth {
             pub_key_vec = temp.freeze().to_vec();
         }
 
+        dbg!(
+            hex::encode(pub_key.serialize()),
+            hex::encode(pub_key.as_bytes()),
+            hex::encode(&pub_key_vec)
+        );
         let pub_hash = calculate_sha256(&pub_key_vec);
 
         let mut msg = [0u8; 20];
@@ -895,7 +900,21 @@ pub struct LitecoinAuth {
 }
 impl LitecoinAuth {
     pub fn new() -> Box<LitecoinAuth> {
-        let sk: [u8; 32] = Generator::random_secret_key().secret_bytes();
+        // Key information
+        // cSoKeLipWLXgdonv3pxE7XBp37yPVAnFcio3ZfGvsdjSWZa67cFJ 1970-01-01T00:00:01Z label=ckb-auth-test-privkey # addr=msv9GiUuCGEaoWzu7YcPDJo8hu5ij3Nzjn,Qe2ByfdQjU5AUZTvZ4XCrmQxHQctBXavWL,tltc1q3qzr64hqq7wnpyn7h79mny6c6lw667kcjva8fn,tmweb1qqd5lvzw07su0msnsmfuuety4pmcqkkm7audj6mlwsjf9flafm2p3xq7pl6cyylpjzw9q4js4t64upy4nfreqwy9mgj4zg5xd3dxsml4y7qr7705e
+        let mut generator = Generator::non_crypto_safe_prng(42);
+        let privkey = generator.gen_privkey();
+
+        unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
+            ::core::slice::from_raw_parts((p as *const T) as *const u8, ::core::mem::size_of::<T>())
+        }
+        let privkey_bytes: &[u8] = unsafe { any_as_u8_slice(&privkey) };
+
+        let sk = bitcoin::secp256k1::SecretKey::from_slice(privkey_bytes).unwrap();
+        let sk = sk.secret_bytes();
+
+        dbg!(hex::encode(&sk));
+
         Box::new(LitecoinAuth {
             official: false,
             sk,
@@ -918,7 +937,9 @@ impl LitecoinAuth {
 }
 impl Auth for LitecoinAuth {
     fn get_pub_key_hash(&self) -> Vec<u8> {
-        BitcoinAuth::get_btc_pub_key_hash(&self.get_privkey(), self.compress)
+        let hash = BitcoinAuth::get_btc_pub_key_hash(&self.get_privkey(), self.compress);
+        dbg!(hex::encode(&hash));
+        hash
     }
     fn get_algorithm_type(&self) -> u8 {
         AlgorithmType::Litecoin as u8
