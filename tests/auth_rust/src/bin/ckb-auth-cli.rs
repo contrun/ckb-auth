@@ -125,8 +125,15 @@ fn parse_address(blockchain: &str, address: &str) {
     );
 }
 
-fn generate_message(_blockchain: &str, pubkeyhash: Vec<u8>) {
-    let algorithm_type = AlgorithmType::Bitcoin;
+fn get_algorithm_type(blockchain: &str) -> Result<AlgorithmType, Error> {
+    match blockchain {
+        "litecoin" => Ok(AlgorithmType::Litecoin),
+        _ => Err(anyhow!("Unknown blochain: {}", blockchain)),
+    }
+}
+
+fn generate_message(blockchain: &str, pubkeyhash: Vec<u8>) {
+    let algorithm_type = get_algorithm_type(blockchain).unwrap();
     let run_type = EntryCategoryType::Exec;
     let auth = auth_builder(algorithm_type, false).unwrap();
     let config = TestConfig::new(&auth, run_type, 1);
@@ -136,8 +143,8 @@ fn generate_message(_blockchain: &str, pubkeyhash: Vec<u8>) {
     println!("{}", hex::encode(message_to_sign.as_bytes()));
 }
 
-fn verify_signature(_blockchain: &str, pubkeyhash: Vec<u8>, signature: Vec<u8>) {
-    let algorithm_type = AlgorithmType::Bitcoin;
+fn verify_signature(blockchain: &str, pubkeyhash: Vec<u8>, signature: Vec<u8>) {
+    let algorithm_type = get_algorithm_type(blockchain).unwrap();
     let run_type = EntryCategoryType::Exec;
     let auth = auth_builder(algorithm_type, false).unwrap();
     let config = TestConfig::new(&auth, run_type, 1);
