@@ -19,7 +19,7 @@ pub fn ckb_auth(
     entry: &CkbEntryType,
     id: &CkbAuthType,
     signature: &[u8],
-    message: &[u8; 32],
+    message: &[u8],
 ) -> Result<(), CkbAuthError> {
     match entry.entry_category {
         EntryCategoryType::Exec => ckb_auth_exec(entry, id, signature, message),
@@ -34,7 +34,7 @@ fn ckb_auth_spawn(
     entry: &CkbEntryType,
     id: &CkbAuthType,
     signature: &[u8],
-    message: &[u8; 32],
+    message: &[u8],
 ) -> Result<(), CkbAuthError> {
     let algorithm_id_str = CString::new(format!("{:02X?}", id.algorithm_id.clone() as u8,))?;
     let signature_str = CString::new(format!("{}", encode(signature)))?;
@@ -56,7 +56,7 @@ fn ckb_auth_exec(
     entry: &CkbEntryType,
     id: &CkbAuthType,
     signature: &[u8],
-    message: &[u8; 32],
+    message: &[u8],
 ) -> Result<(), CkbAuthError> {
     let algorithm_id_str = CString::new(format!("{:02X?}", id.algorithm_id.clone() as u8,))?;
     let signature_str = CString::new(format!("{}", encode(signature)))?;
@@ -161,7 +161,7 @@ fn ckb_auth_dl(
     entry: &CkbEntryType,
     id: &CkbAuthType,
     signature: &[u8],
-    message: &[u8; 32],
+    message: &[u8],
 ) -> Result<(), CkbAuthError> {
     let func: Symbol<CkbAuthValidate> = CKBDLLoader::get().get_validate_func(
         &entry.code_hash,
