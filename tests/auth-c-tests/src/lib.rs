@@ -1949,7 +1949,7 @@ impl Auth for Secp256r1RawAuth {
         // let mut buffer = String::new();
         // std::io::stdin().read_line(&mut buffer).expect("read line");
         // println!("stdin: {}", &buffer.trim());
-        let buffer = "64349e6ea4b57285f1319023804863855824f54c40c83112425c26b4e7f49f348af3546840180932d99a1c1394a6f0ef90bb118cd7e61278552ecb26e22ed49c".to_string();
+        let buffer = "64dc8e742ec0bfd3e5504ecdb4fb24fa49b68cccd05a8a4a538859ea4d239f7aae31ce32cca69b92198aed7e5d122b9062feffe5e5788725147cf6193acbcc03".to_string();
         let signature = hex::decode(&buffer.trim()).expect("signature decode");
         dbg!(hex::encode(&signature));
         dbg!(hex::encode(&signature), &signature.len(), pub_key.len());
