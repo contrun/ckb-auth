@@ -1946,9 +1946,10 @@ impl Auth for Secp256r1RawAuth {
         // So we don't need to do any hashing here.
         let signature: Signature = self.key.sign(msg.as_bytes());
         let signature = signature.to_vec();
-        let mut buffer = String::new();
-        std::io::stdin().read_line(&mut buffer).expect("read line");
-        println!("stdin: {}", &buffer.trim());
+        // let mut buffer = String::new();
+        // std::io::stdin().read_line(&mut buffer).expect("read line");
+        // println!("stdin: {}", &buffer.trim());
+        let buffer = "64349e6ea4b57285f1319023804863855824f54c40c83112425c26b4e7f49f348af3546840180932d99a1c1394a6f0ef90bb118cd7e61278552ecb26e22ed49c".to_string();
         let signature = hex::decode(&buffer.trim()).expect("signature decode");
         dbg!(hex::encode(&signature));
         dbg!(hex::encode(&signature), &signature.len(), pub_key.len());
