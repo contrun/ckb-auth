@@ -1937,7 +1937,7 @@ impl Auth for Secp256r1RawAuth {
 
         // Note by default, p256 will sign the sha256 hash of the message.
         // So we don't need to do any hashing here.
-        let signature: Signature = self.key.sign(msg.as_bytes());
+        let signature: Signature = self.key.sign_prehash(msg.as_bytes());
         let signature = signature.to_vec();
         dbg!(hex::encode(&signature), &signature.len(), pub_key.len());
         let signature: Vec<u8> = pub_key.iter().chain(&signature).map(|x| *x).collect();
