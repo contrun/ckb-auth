@@ -1,5 +1,7 @@
 #define CKB_C_STDLIB_PRINTF
 #include <stdio.h>
+#include <stdarg.h>
+#include "ckb_syscalls.h"
 
 // Usage:
 //     hex_dump(desc, addr, len, perLine);
@@ -8,11 +10,10 @@
 //         len:     the number of bytes to dump.
 //         perLine: number of bytes on each output line.
 
-void hex_dump(const char *desc, const void *addr, const int len, int perLine) {
+void hex_dump(const char *desc, const void *addr, const int len) {
   // Silently ignore silly per-line values.
 
-  if (perLine < 4 || perLine > 64)
-    perLine = 16;
+  int perLine = 16;
 
   int i;
   unsigned char buff[perLine + 1];
@@ -74,3 +75,13 @@ void hex_dump(const char *desc, const void *addr, const int len, int perLine) {
 
   printf("  %s\n", buff);
 }
+
+void ext_printf(const char *format, ...)
+{
+	va_list arglist;
+
+	va_start(arglist, format);
+	ckb_printf(format, arglist);
+	va_end(arglist);
+}
+

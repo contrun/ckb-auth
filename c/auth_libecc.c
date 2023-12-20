@@ -124,14 +124,14 @@ ckb_auth_validate(uint8_t auth_algorithm_id, const uint8_t *signature,
 
   printf("Hello from %s\n", __func__);
   if (auth_algorithm_id == AuthAlgorithmIdSecp256R1) {
-    hex_dump("signature", signature, signature_size, 0);
-    hex_dump("message", message, message_size, 0);
+    hex_dump("signature", signature, signature_size);
+    hex_dump("message", message, message_size);
     err = verify(pubkey_hash, signature, signature_size, message, message_size,
                  validate_signature_secp256r1, convert_copy);
     CHECK(err);
   } else if (auth_algorithm_id == AuthAlgorithmIdSecp256R1Raw) {
-    hex_dump("signature", signature, signature_size, 0);
-    hex_dump("message", message, message_size, 0);
+    hex_dump("signature", signature, signature_size);
+    hex_dump("message", message, message_size);
     err = verify(pubkey_hash, signature, signature_size, message, message_size,
                  validate_signature_secp256r1_raw, convert_copy);
     CHECK(err);

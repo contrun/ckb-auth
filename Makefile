@@ -5,7 +5,7 @@ OBJCOPY := $(TARGET)-objcopy
 AR := $(TARGET)-ar
 
 CFLAGS := -g -O3 -fPIC \
-		-Wall -Werror -Wno-nonnull -Wno-nonnull-compare -Wno-unused-function -Wno-dangling-pointer \
+		-Wall -Wno-nonnull -Wno-nonnull-compare -Wno-unused-function -Wno-dangling-pointer \
 		-fno-builtin-printf -fno-builtin-memcmp \
 		-nostdinc -nostdlib -nostartfiles -fvisibility=hidden \
 		-fdata-sections -ffunction-sections
@@ -21,7 +21,7 @@ PASSED_MBEDTLS_CFLAGS := $(CFLAGS) -DCKB_DECLARATION_ONLY -I ../../ckb-c-stdlib-
 
 SECP256K1_SRC_20210801 := deps/secp256k1-20210801/src/ecmult_static_pre_context.h
 
-CFLAGS_LIBECC := -fno-builtin -DUSER_NN_BIT_LEN=256 -DWORDSIZE=64 -DWITH_STDLIB -DWITH_CKB -DCKB_DECLARATION_ONLY -fPIC -g -O3
+CFLAGS_LIBECC := -fno-builtin -DUSER_NN_BIT_LEN=256 -DWORDSIZE=64 -DVERBOSE_INNER_VALUES -DWITH_STDLIB -DWITH_CKB -DCKB_DECLARATION_ONLY -fPIC -g -O3
 LIBECC_OPTIMIZED_PATH := deps/libecc
 LIBECC_OPTIMIZED_FILES := ${LIBECC_OPTIMIZED_PATH}/build/libarith.a ${LIBECC_OPTIMIZED_PATH}/build/libec.a ${LIBECC_OPTIMIZED_PATH}/build/libsign.a
 CFLAGS_LIBECC_OPTIMIZED = -I ../ckb-c-stdlib-2023 -I ../ckb-c-stdlib-2023/libc -I ../ckb-c-stdlib-2023/molecule $(CFLAGS_LIBECC) -DWITH_LL_U256_MONT
