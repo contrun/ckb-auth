@@ -19,7 +19,7 @@ use ckb_types::{
 use dyn_clone::{clone_trait_object, DynClone};
 use hex;
 use log::{Metadata, Record};
-use rand::{distributions::Standard, thread_rng, Rng};
+use rand::{distributions::Standard, Rng};
 use secp256k1;
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Keccak256};
@@ -43,6 +43,11 @@ pub const RNG_SEED: u64 = 42;
 pub const SOLANA_MAXIMUM_UNWRAPPED_SIGNATURE_SIZE: usize = 510;
 pub const SOLANA_MAXIMUM_WRAPPED_SIGNATURE_SIZE: usize =
     SOLANA_MAXIMUM_UNWRAPPED_SIGNATURE_SIZE + 2;
+
+pub fn deterministic_rng() -> rand::rngs::SmallRng {
+    let rng: rand::rngs::SmallRng = rand::SeedableRng::seed_from_u64(42u64);
+    rng
+}
 
 lazy_static! {
     pub static ref ORIGINAL_AUTH_PROGRAM: Bytes =
@@ -270,7 +275,7 @@ pub fn sign_tx_by_input_group(
     begin_index: usize,
     len: usize,
 ) -> TransactionView {
-    let mut rng = thread_rng();
+    let mut rng = deterministic_rng();
     let tx_hash = tx.hash();
     let mut signed_witnesses: Vec<packed::Bytes> = tx
         .inputs()
@@ -462,7 +467,7 @@ pub fn gen_tx_with_pub_key_hash(
 pub fn gen_tx(dummy: &mut DummyDataLoader, config: &TestConfig) -> TransactionView {
     let lock_args = gen_args(&config);
 
-    let mut rng = thread_rng();
+    let mut rng = deterministic_rng();
     gen_tx_with_grouped_args(
         dummy,
         vec![(lock_args, config.sign_size as usize)],
@@ -608,7 +613,7 @@ pub fn do_gen_args(config: &TestConfig, pub_key_hash: Option<Vec<u8>>) -> Bytes 
             .pubkey_hash
             .copy_from_slice(pub_hash.as_slice());
     } else {
-        let mut rng = thread_rng();
+        let mut rng = deterministic_rng();
         let incorrect_pubkey = {
             let mut buf = [0u8; 32];
             rng.fill(&mut buf);
@@ -867,7 +872,7 @@ pub struct EthereumAuth {
 impl EthereumAuth {
     fn new() -> Box<EthereumAuth> {
         let generator: secp256k1::Secp256k1<secp256k1::All> = secp256k1::Secp256k1::new();
-        let mut rng = thread_rng();
+        let mut rng = deterministic_rng();
         let (privkey, pubkey) = generator.generate_keypair(&mut rng);
         Box::new(EthereumAuth {
             privkey,
@@ -976,7 +981,7 @@ pub struct TronAuth {
 impl TronAuth {
     fn new() -> Box<dyn Auth> {
         let generator: secp256k1::Secp256k1<secp256k1::All> = secp256k1::Secp256k1::new();
-        let mut rng = thread_rng();
+        let mut rng = deterministic_rng();
         let (privkey, pubkey) = generator.generate_keypair(&mut rng);
         Box::new(TronAuth { privkey, pubkey })
     }
@@ -1034,7 +1039,7 @@ impl BitcoinAuth {
     }
 
     pub fn new_rng_key(v_type: BitcoinSignVType, btc_network: BtcNetwork) -> Self {
-        let mut rng = thread_rng();
+        let mut rng = deterministic_rng();
         let mut secret_key = [0u8; 32];
         rng.fill(&mut secret_key);
 
@@ -1429,7 +1434,7 @@ pub struct MoneroAuth {
 impl MoneroAuth {
     pub fn new() -> Box<MoneroAuth> {
         fn get_random_key_pair() -> monero::KeyPair {
-            let mut rng = thread_rng();
+            let mut rng = deterministic_rng();
             let mut seed = vec![0; 32];
             let spend_key = loop {
                 rng.fill(seed.as_mut_slice());
@@ -2042,7 +2047,7 @@ pub struct SchnorrAuth {
 impl SchnorrAuth {
     pub fn new() -> Box<dyn Auth> {
         let generator: secp256k1::Secp256k1<secp256k1::All> = secp256k1::Secp256k1::new();
-        let mut rng = thread_rng();
+        let mut rng = deterministic_rng();
         let (privkey, pubkey) = generator.generate_keypair(&mut rng);
         Box::new(SchnorrAuth { privkey, pubkey })
     }
