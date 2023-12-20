@@ -80,9 +80,9 @@ int convert_aff_buf_to_prj_buf(const uint8_t *aff_buf, uint32_t aff_buf_len,
 }
 
 int do_secp256r1_verify_signature(const uint8_t *sig, uint8_t siglen,
-                               const uint8_t *pk, uint32_t pklen,
-                               const uint8_t *m, uint32_t mlen,
-                               const char *hash_algorithm) {
+                                  const uint8_t *pk, uint32_t pklen,
+                                  const uint8_t *m, uint32_t mlen,
+                                  const char *hash_algorithm) {
   const ec_str_params *ec_str_p;
   ec_sig_alg_type sig_type;
   hash_alg_type hash_type;
@@ -90,6 +90,8 @@ int do_secp256r1_verify_signature(const uint8_t *sig, uint8_t siglen,
   ec_params params;
   int ret;
 
+  printf("============= %s\n", __func__);
+  printf("Hello from %s\n", __func__);
   uint8_t pj_pk_buf[projective_buffer_size];
   ret = convert_aff_buf_to_prj_buf(pk, pklen, pj_pk_buf, sizeof(pj_pk_buf));
   if (ret) {
@@ -111,6 +113,7 @@ int do_secp256r1_verify_signature(const uint8_t *sig, uint8_t siglen,
     return ERROR_INVALID_ARG;
   }
 
+  printf("Hash type: %d, hash algorithm: %s\n", hash_type, hash_algorithm);
   ret = ec_verify(sig, siglen, &pub_key, m, mlen, sig_type, hash_type);
   if (ret) {
     return ERROR_SPAWN_INVALID_SIG;
@@ -122,11 +125,14 @@ int do_secp256r1_verify_signature(const uint8_t *sig, uint8_t siglen,
 int secp256r1_verify_signature(const uint8_t *sig, uint8_t siglen,
                                const uint8_t *pk, uint32_t pklen,
                                const uint8_t *m, uint32_t mlen) {
-  return do_secp256r1_verify_signature(sig, siglen, pk, pklen, m, mlen, sha256_hash_algorithm_name);
+  return do_secp256r1_verify_signature(sig, siglen, pk, pklen, m, mlen,
+                                       sha256_hash_algorithm_name);
 }
 
 int secp256r1_raw_verify_signature(const uint8_t *sig, uint8_t siglen,
-                               const uint8_t *pk, uint32_t pklen,
-                               const uint8_t *m, uint32_t mlen) {
-  return do_secp256r1_verify_signature(sig, siglen, pk, pklen, m, mlen, copy256_hash_algorithm_name);
+                                   const uint8_t *pk, uint32_t pklen,
+                                   const uint8_t *m, uint32_t mlen) {
+  printf("Hello from %s\n", __func__);
+  return do_secp256r1_verify_signature(sig, siglen, pk, pklen, m, mlen,
+                                       copy256_hash_algorithm_name);
 }

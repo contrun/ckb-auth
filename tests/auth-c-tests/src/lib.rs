@@ -1894,11 +1894,12 @@ pub struct Secp256r1RawAuth {
 impl Secp256r1RawAuth {
     pub fn new() -> Box<Secp256r1RawAuth> {
         use p256::ecdsa::SigningKey;
-        const SECRET_KEY: [u8; 32] = [
-            0x51, 0x9b, 0x42, 0x3d, 0x71, 0x5f, 0x8b, 0x58, 0x1f, 0x4f, 0xa8, 0xee, 0x59, 0xf4,
-            0x77, 0x1a, 0x5b, 0x44, 0xc8, 0x13, 0x0b, 0x4e, 0x3e, 0xac, 0xca, 0x54, 0xa5, 0x6d,
-            0xda, 0x72, 0xb4, 0x64,
-        ];
+        let SECRET_KEY: [u8; 32] = hex::decode(
+            "3C5230BA330BE05EA89E25CC9837D98463CAAECC9081249D9CB7A8ECCC5A8661".to_string(),
+        )
+        .expect("valid secret key")
+        .try_into()
+        .expect("valid [u8; 32]");
 
         let sk = SigningKey::from_bytes(&SECRET_KEY).unwrap();
         Box::new(Self { key: Arc::new(sk) })
@@ -1934,11 +1935,17 @@ impl Auth for Secp256r1RawAuth {
 
         let pub_key = self.get_pub_key_bytes();
         dbg!(hex::encode(&msg));
+        dbg!(hex::encode(self.key.to_bytes()));
 
         // Note by default, p256 will sign the sha256 hash of the message.
         // So we don't need to do any hashing here.
-        let signature: Signature = self.key.sign_prehash(msg.as_bytes());
+        let signature: Signature = self.key.sign(msg.as_bytes());
         let signature = signature.to_vec();
+        let mut buffer = String::new();
+        std::io::stdin().read_line(&mut buffer).expect("read line");
+        println!("stdin: {}", &buffer.trim());
+        let signature = hex::decode(&buffer.trim()).expect("signature decode");
+        dbg!(hex::encode(&signature));
         dbg!(hex::encode(&signature), &signature.len(), pub_key.len());
         let signature: Vec<u8> = pub_key.iter().chain(&signature).map(|x| *x).collect();
 

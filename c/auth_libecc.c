@@ -54,6 +54,7 @@ int validate_signature_secp256r1_raw(void *prefilled_data, const uint8_t *sig,
                                      size_t *output_len) {
   int err = 0;
 
+  printf("Hello from %s\n", __func__);
   if (*output_len < AUTH160_SIZE) {
     return ERROR_INVALID_ARG;
   }
@@ -92,6 +93,7 @@ static int verify(uint8_t *pubkey_hash, const uint8_t *sig, uint32_t sig_len,
   int err = 0;
   uint8_t new_msg[BLAKE2B_BLOCK_SIZE];
 
+  printf("Hello from %s\n", __func__);
   err = convert(msg, msg_len, new_msg, sizeof(new_msg));
   CHECK(err);
 
@@ -120,6 +122,7 @@ ckb_auth_validate(uint8_t auth_algorithm_id, const uint8_t *signature,
   CHECK2(message_size > 0, ERROR_INVALID_ARG);
   CHECK2(pubkey_hash_size == AUTH160_SIZE, ERROR_INVALID_ARG);
 
+  printf("Hello from %s\n", __func__);
   if (auth_algorithm_id == AuthAlgorithmIdSecp256R1) {
     hex_dump("signature", signature, signature_size, 0);
     hex_dump("message", message, message_size, 0);
@@ -150,5 +153,6 @@ int main(int argc, char *argv[]) {
   }
 #endif
 
+  printf("Hello from %s\n", __func__);
   return ckb_auth_validate_with_func(argc, argv, *ckb_auth_validate);
 }
