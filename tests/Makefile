@@ -1,4 +1,10 @@
+# This may cause insufficient storage space, so add clean
+t: \
+	build-auth-lock \
+	c-tests-t
 
+c-tests-t:
+	export PATH=$(shell pwd)/bin/:"$(PATH)" && cd auth-c-tests && cargo test tests::secp256r1_raw_verify -- --nocapture
 
 # This may cause insufficient storage space, so add clean
 all: \

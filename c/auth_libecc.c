@@ -181,7 +181,6 @@ __attribute__((visibility("default"))) int ckb_auth_validate(
     } else {
         CHECK2(false, ERROR_NOT_IMPLEMENTED);
     }
-||||||| parent of 7c6cbb2 (format code)
     if (auth_algorithm_id == AuthAlgorithmIdSecp256R1) {
         err = verify(pubkey_hash, signature, signature_size, message,
                      message_size, validate_signature_secp256r1, convert_copy);
@@ -194,20 +193,6 @@ __attribute__((visibility("default"))) int ckb_auth_validate(
     } else {
         CHECK2(false, ERROR_NOT_IMPLEMENTED);
     }
-=======
-    if (auth_algorithm_id == AuthAlgorithmIdSecp256R1) {
-        err = verify(pubkey_hash, signature, signature_size, message,
-                     message_size, validate_signature_secp256r1, convert_copy);
-        CHECK(err);
-    } else if (auth_algorithm_id == AuthAlgorithmIdSecp256R1Raw) {
-        err = verify(pubkey_hash, signature, signature_size, message,
-                     message_size, validate_signature_secp256r1_raw,
-                     convert_copy);
-        CHECK(err);
-    } else {
-        CHECK2(false, ERROR_NOT_IMPLEMENTED);
-    }
->>>>>>> 7c6cbb2 (format code)
 exit:
     return err;
 }
@@ -223,11 +208,5 @@ int main(int argc, char *argv[]) {
     }
 #endif
 
-    < < < < < < < HEAD printf("Hello from %s\n", __func__);
     return ckb_auth_validate_with_func(argc, argv, *ckb_auth_validate);
-||||||| parent of 7c6cbb2 (format code)
-    return ckb_auth_validate_with_func(argc, argv, *ckb_auth_validate);
-=======
-    return ckb_auth_validate_with_func(argc, argv, *ckb_auth_validate);
->>>>>>> 7c6cbb2 (format code)
 }
