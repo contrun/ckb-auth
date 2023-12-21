@@ -1,3 +1,5 @@
+#include "dump.c"
+
 #include "ckb_auth.h"
 
 // clang-format off
@@ -160,11 +162,13 @@ ckb_auth_validate(uint8_t auth_algorithm_id, const uint8_t *signature,
   } else if (auth_algorithm_id == AuthAlgorithmIdSecp256R1Raw) {
     err = verify(pubkey_hash, signature, signature_size, message, message_size,
                  validate_signature_secp256r1_raw, convert_copy);
+    printf("Error %d\n", err);
     CHECK(err);
   } else {
     CHECK2(false, ERROR_NOT_IMPLEMENTED);
   }
 exit:
+  printf("Error %d\n", err);
   return err;
 }
 

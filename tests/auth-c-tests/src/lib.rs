@@ -544,7 +544,7 @@ pub enum TestConfigIncorrectSing {
     Smaller,
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum TestConfigAuthLockType {
     C,
     Rust,

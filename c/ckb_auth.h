@@ -148,6 +148,7 @@ static size_t g_dl_cache_count = 0;
 
 int get_dl_func_by_code_hash(const uint8_t *code_hash, uint8_t hash_type,
                              ckb_auth_validate_t *out_func) {
+    printf("running %s\n", __func__);
     // Find from cache
     for (size_t i = 0; i < g_dl_cache_count; i++) {
         CkbDLCache *cache = &g_dl_cache[i];
@@ -199,6 +200,7 @@ int get_dl_func_by_code_hash(const uint8_t *code_hash, uint8_t hash_type,
 int ckb_auth(CkbEntryType *entry, CkbAuthType *id, const uint8_t *signature,
              uint32_t signature_size, const uint8_t *message32) {
     int err = 0;
+    printf("running %s\n", __func__);
     if (entry->entry_category == EntryCategoryDynamicLibrary) {
 #ifdef CKB_AUTH_DISABLE_DYNAMIC_LIB
         // Disable DynamicLibrary via macro can save memory
@@ -210,6 +212,7 @@ int ckb_auth(CkbEntryType *entry, CkbAuthType *id, const uint8_t *signature,
         if (err) {
             return err;
         }
+        printf("running %s\n", __func__);
         return func(id->algorithm_id, signature, signature_size, message32,
                     BLAKE2B_BLOCK_SIZE, id->content, AUTH160_SIZE);
 #endif  // CKB_AUTH_DISABLE_DYNAMIC_LIB
@@ -276,6 +279,7 @@ int setup_elf() {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Warray-bounds"
 #endif
+    printf("running %s\n", __func__);
     uint64_t *phoff = (uint64_t *)OFFSETOF(Elf64_Ehdr, e_phoff);
     uint16_t *phnum = (uint16_t *)OFFSETOF(Elf64_Ehdr, e_phnum);
     Elf64_Phdr *program_headers = (Elf64_Phdr *)(*phoff);
@@ -361,6 +365,7 @@ int setup_elf() {
 static int ckb_auth_validate_with_func(int argc, char *argv[], ckb_auth_validate_t validate_func) {
     int err = 0;
 
+    printf("running %s\n", __func__);
     if (argc != 4) {
         return -1;
     }
