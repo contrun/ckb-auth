@@ -1,3 +1,5 @@
+#include "dump.c"
+
 // clang-format off
 #include "mbedtls/md.h"
 #include "mbedtls/md_internal.h"
@@ -93,7 +95,8 @@ exit:
 static int _recover_secp256k1_pubkey(const uint8_t *sig, size_t sig_len,
                                      const uint8_t *msg, size_t msg_len,
                                      uint8_t *out_pubkey,
-                                     size_t *out_pubkey_size, int recid, bool compressed) {
+                                     size_t *out_pubkey_size, int recid,
+                                     bool compressed) {
     int ret = 0;
 
     if (sig_len != SECP256K1_SIGNATURE_SIZE) {
@@ -180,6 +183,7 @@ static int _recover_secp256k1_pubkey_btc(const uint8_t *sig, size_t sig_len,
     BTCVType v_type;
     int recid = get_btc_recid(sig[0], &v_type);
     if (recid == -1) {
+        return recid;
         return ERROR_INVALID_ARG;
     }
 
@@ -208,18 +212,23 @@ static int _recover_secp256k1_pubkey_btc(const uint8_t *sig, size_t sig_len,
     if (v_type == BTCVType_P2PKHUncompressed) {
         *out_pubkey_size = UNCOMPRESSED_SECP256K1_PUBKEY_SIZE;
         flag = SECP256K1_EC_UNCOMPRESSED;
-        if (secp256k1_ec_pubkey_serialize(&context, out_pubkey, out_pubkey_size, &pubkey, flag) != 1) {
+        if (secp256k1_ec_pubkey_serialize(&context, out_pubkey, out_pubkey_size,
+                                          &pubkey, flag) != 1) {
             return ERROR_WRONG_STATE;
         }
-    } else if (v_type == BTCVType_P2PKHCompressed || v_type == BTCVType_SegwitBech32 || v_type == BTCVType_SegwitP2SH) {
+    } else if (v_type == BTCVType_P2PKHCompressed ||
+               v_type == BTCVType_SegwitBech32 ||
+               v_type == BTCVType_SegwitP2SH) {
         *out_pubkey_size = SECP256K1_PUBKEY_SIZE;
         flag = SECP256K1_EC_COMPRESSED;
-        if (secp256k1_ec_pubkey_serialize(&context, out_pubkey, out_pubkey_size, &pubkey, flag) != 1) {
+        if (secp256k1_ec_pubkey_serialize(&context, out_pubkey, out_pubkey_size,
+                                          &pubkey, flag) != 1) {
             return ERROR_WRONG_STATE;
         }
 
         if (v_type == BTCVType_SegwitP2SH) {
-            const mbedtls_md_info_t *md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+            const mbedtls_md_info_t *md_info =
+                mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
             unsigned char temp[SHA256_SIZE];
             int err = md_string(md_info, out_pubkey, *out_pubkey_size, temp);
             if (err) return err;
@@ -250,7 +259,8 @@ int validate_signature_ckb(void *prefilled_data, const uint8_t *sig,
     uint8_t out_pubkey[SECP256K1_PUBKEY_SIZE];
     size_t out_pubkey_size = SECP256K1_PUBKEY_SIZE;
 
-    ret = _recover_secp256k1_pubkey(sig, sig_len, msg, msg_len, out_pubkey, &out_pubkey_size, sig[RECID_INDEX], true);
+    ret = _recover_secp256k1_pubkey(sig, sig_len, msg, msg_len, out_pubkey,
+                                    &out_pubkey_size, sig[RECID_INDEX], true);
     if (ret != 0) return ret;
 
     blake2b_state ctx;
@@ -292,7 +302,8 @@ int validate_signature_eth(void *prefilled_data, const uint8_t *sig,
         return ERROR_INVALID_ARG;
     }
 
-    ret = _recover_secp256k1_pubkey(sig, sig_len, msg, msg_len, out_pubkey, &out_pubkey_size, recid, false);
+    ret = _recover_secp256k1_pubkey(sig, sig_len, msg, msg_len, out_pubkey,
+                                    &out_pubkey_size, recid, false);
     if (ret != 0) return ret;
 
     // here are the 2 differences than validate_signature_secp256k1
@@ -307,7 +318,8 @@ int validate_signature_eth(void *prefilled_data, const uint8_t *sig,
     return ret;
 }
 
-int validate_signature_eos(void *prefilled_data, const uint8_t *sig, size_t sig_len, const uint8_t *msg, size_t msg_len,
+int validate_signature_eos(void *prefilled_data, const uint8_t *sig,
+                           size_t sig_len, const uint8_t *msg, size_t msg_len,
                            uint8_t *output, size_t *output_len) {
     int err = 0;
     if (*output_len < AUTH160_SIZE) {
@@ -315,7 +327,8 @@ int validate_signature_eos(void *prefilled_data, const uint8_t *sig, size_t sig_
     }
     uint8_t out_pubkey[UNCOMPRESSED_SECP256K1_PUBKEY_SIZE];
     size_t out_pubkey_size = UNCOMPRESSED_SECP256K1_PUBKEY_SIZE;
-    err = _recover_secp256k1_pubkey_btc(sig, sig_len, msg, msg_len, out_pubkey, &out_pubkey_size);
+    err = _recover_secp256k1_pubkey_btc(sig, sig_len, msg, msg_len, out_pubkey,
+                                        &out_pubkey_size);
     CHECK(err);
 
     blake2b_state ctx;
@@ -342,6 +355,7 @@ int validate_signature_btc(void *prefilled_data, const uint8_t *sig,
                                         &out_pubkey_size);
     CHECK(err);
 
+    hex_dump("recovered pubkey", out_pubkey, out_pubkey_size);
     const mbedtls_md_info_t *md_info =
         mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
     unsigned char temp[SHA256_SIZE];
@@ -476,10 +490,11 @@ size_t write_varint(uint8_t *dest, size_t n) {
 }
 
 // Read uint16_t from varint buffer
-// See https://github.com/solana-labs/solana/blob/3b0b0ba07d345ef86e270187a1a7d99bd0da7f4c/sdk/program/src/short_vec.rs#L120-L148
+// See
+// https://github.com/solana-labs/solana/blob/3b0b0ba07d345ef86e270187a1a7d99bd0da7f4c/sdk/program/src/short_vec.rs#L120-L148
 int read_varint_u16(uint8_t **src, size_t src_size, uint16_t *result) {
     size_t maximum_full_bytes = sizeof(uint16_t) * 8 / 7;
-  
+
     uint8_t *ptr = *src;
     uint16_t acc = 0;
     for (size_t i = 0; i <= maximum_full_bytes; i++) {
@@ -487,9 +502,11 @@ int read_varint_u16(uint8_t **src, size_t src_size, uint16_t *result) {
             return -1;
         }
         uint8_t current_value = *ptr;
-        size_t bits = (i < maximum_full_bytes) ? 7 : sizeof(uint16_t)*8 - maximum_full_bytes*7; 
+        size_t bits = (i < maximum_full_bytes)
+                          ? 7
+                          : sizeof(uint16_t) * 8 - maximum_full_bytes * 7;
         uint8_t maximum_value = (1 << bits) - 1;
-        acc += ((uint16_t)(current_value & maximum_value) << (i*7));
+        acc += ((uint16_t)(current_value & maximum_value) << (i * 7));
         ptr = ptr + 1;
         if (current_value < 0x80 && i < maximum_full_bytes) {
             *src = ptr;
@@ -619,24 +636,37 @@ exit:
     return err;
 }
 
-int validate_solana_signed_message(const uint8_t *signed_msg, size_t signed_msg_len, const uint8_t *pub_key,
-    const uint8_t *blockhash) {
+int validate_solana_signed_message(const uint8_t *signed_msg,
+                                   size_t signed_msg_len,
+                                   const uint8_t *pub_key,
+                                   const uint8_t *blockhash) {
     int err = 0;
     // Official solana transaction structure documentation.
-    // [Transactions | Solana Docs](https://docs.solana.com/developing/programming-model/transactions)
+    // [Transactions | Solana
+    // Docs](https://docs.solana.com/developing/programming-model/transactions)
     // See also
     // https://github.com/solana-labs/solana/blob/3b0b0ba07d345ef86e270187a1a7d99bd0da7f4c/sdk/program/src/message/legacy.rs#L90-L129
-    CHECK2(signed_msg_len > SOLANA_MESSAGE_HEADER_SIZE + SOLANA_BLOCKHASH_SIZE, ERROR_INVALID_ARG);
+    CHECK2(signed_msg_len > SOLANA_MESSAGE_HEADER_SIZE + SOLANA_BLOCKHASH_SIZE,
+           ERROR_INVALID_ARG);
     uint8_t num_signers = *signed_msg;
     uint16_t num_keys = 0;
     uint8_t *pub_key_ptr = (uint8_t *)(signed_msg + SOLANA_MESSAGE_HEADER_SIZE);
-    CHECK2(read_varint_u16(&pub_key_ptr, signed_msg_len - SOLANA_MESSAGE_HEADER_SIZE, &num_keys) == 0, ERROR_INVALID_ARG);
-    size_t pub_key_size = (pub_key_ptr - (uint8_t *)(signed_msg + SOLANA_MESSAGE_HEADER_SIZE)) + SOLANA_PUBKEY_SIZE * num_keys;
-    CHECK2(signed_msg_len > SOLANA_MESSAGE_HEADER_SIZE + pub_key_size + SOLANA_BLOCKHASH_SIZE, ERROR_INVALID_ARG);
-    const uint8_t *blockhash_ptr = signed_msg + SOLANA_MESSAGE_HEADER_SIZE + pub_key_size;
-    CHECK2(memcmp(blockhash_ptr, blockhash, SOLANA_BLOCKHASH_SIZE) == 0, ERROR_INVALID_ARG);
-    for (uint8_t i=0; i<num_signers; i++) {
-        uint8_t *tmp_pub_key = pub_key_ptr + i*SOLANA_PUBKEY_SIZE;
+    CHECK2(read_varint_u16(&pub_key_ptr,
+                           signed_msg_len - SOLANA_MESSAGE_HEADER_SIZE,
+                           &num_keys) == 0,
+           ERROR_INVALID_ARG);
+    size_t pub_key_size =
+        (pub_key_ptr - (uint8_t *)(signed_msg + SOLANA_MESSAGE_HEADER_SIZE)) +
+        SOLANA_PUBKEY_SIZE * num_keys;
+    CHECK2(signed_msg_len > SOLANA_MESSAGE_HEADER_SIZE + pub_key_size +
+                                SOLANA_BLOCKHASH_SIZE,
+           ERROR_INVALID_ARG);
+    const uint8_t *blockhash_ptr =
+        signed_msg + SOLANA_MESSAGE_HEADER_SIZE + pub_key_size;
+    CHECK2(memcmp(blockhash_ptr, blockhash, SOLANA_BLOCKHASH_SIZE) == 0,
+           ERROR_INVALID_ARG);
+    for (uint8_t i = 0; i < num_signers; i++) {
+        uint8_t *tmp_pub_key = pub_key_ptr + i * SOLANA_PUBKEY_SIZE;
         if (memcmp(tmp_pub_key, pub_key, SOLANA_PUBKEY_SIZE) == 0) {
             return 0;
         }
@@ -657,14 +687,17 @@ int validate_signature_solana(void *prefilled_data, const uint8_t *sig,
     sig_len = (size_t)sig[0] | ((size_t)sig[1] << 8);
     CHECK2(sig_len <= SOLANA_UNWRAPPED_SIGNATURE_SIZE, ERROR_INVALID_ARG);
     const uint8_t *signature_ptr = sig + 2;
-    const uint8_t *pub_key_ptr =  signature_ptr + SOLANA_SIGNATURE_SIZE;
-    const uint8_t *signed_msg_ptr = signature_ptr + SOLANA_SIGNATURE_SIZE + SOLANA_PUBKEY_SIZE;
-    size_t signed_msg_len = sig_len - SOLANA_SIGNATURE_SIZE - SOLANA_PUBKEY_SIZE;
+    const uint8_t *pub_key_ptr = signature_ptr + SOLANA_SIGNATURE_SIZE;
+    const uint8_t *signed_msg_ptr =
+        signature_ptr + SOLANA_SIGNATURE_SIZE + SOLANA_PUBKEY_SIZE;
+    size_t signed_msg_len =
+        sig_len - SOLANA_SIGNATURE_SIZE - SOLANA_PUBKEY_SIZE;
 
-    CHECK(validate_solana_signed_message(signed_msg_ptr, signed_msg_len, pub_key_ptr, msg));
+    CHECK(validate_solana_signed_message(signed_msg_ptr, signed_msg_len,
+                                         pub_key_ptr, msg));
 
-
-    int suc = ed25519_verify(signature_ptr, signed_msg_ptr, signed_msg_len, pub_key_ptr);
+    int suc = ed25519_verify(signature_ptr, signed_msg_ptr, signed_msg_len,
+                             pub_key_ptr);
     CHECK2(suc == 1, ERROR_WRONG_STATE);
 
     blake2b_state ctx;
@@ -679,49 +712,51 @@ exit:
     return err;
 }
 
-
 // Ton uses ed25519 to sign messages. The message to be signed is
 // message = utf8_encode("ton-proof-item-v2/") ++
 //           Address ++
 //           AppDomain ++
 //           Timestamp ++
 //           Payload
-// signature = Ed25519Sign(privkey, sha256(0xffff ++ utf8_encode("ton-connect") ++ sha256(message)))
-// where
-// Prefix = 18 bytes "ton-proof-item-v2/" without trailing null
-// Address = Big endian work chain (uint32) + address (32 bytes)
-// AppDomain = Little endian domain length (uint32) + domain (string without trailling null)
-// Timestamp = Epoch seconds Little endian uint64
-// Payload = Arbitrary bytes, we use block hash here
-// See ton official document on ton-proof https://docs.ton.org/develop/dapps/ton-connect/sign
-int get_toncoin_message(const uint8_t *signed_msg, size_t signed_msg_len, const uint8_t *blockhash, uint8_t output[32]) {
+// signature = Ed25519Sign(privkey, sha256(0xffff ++ utf8_encode("ton-connect")
+// ++ sha256(message))) where Prefix = 18 bytes "ton-proof-item-v2/" without
+// trailing null Address = Big endian work chain (uint32) + address (32 bytes)
+// AppDomain = Little endian domain length (uint32) + domain (string without
+// trailling null) Timestamp = Epoch seconds Little endian uint64 Payload =
+// Arbitrary bytes, we use block hash here See ton official document on
+// ton-proof https://docs.ton.org/develop/dapps/ton-connect/sign
+int get_toncoin_message(const uint8_t *signed_msg, size_t signed_msg_len,
+                        const uint8_t *blockhash, uint8_t output[32]) {
     int err = 0;
     uint8_t preimage1[TONCOIN_MAX_PREIMAGE_SIZE];
     uint8_t preimage2[TONCOIN_PREIMAGE2_SIZE];
 
-    int preimage1_size = signed_msg_len + TONCOIN_MESSAGE_PREFIX_SIZE + TONCOIN_BLOCKHASH_SIZE;
+    int preimage1_size =
+        signed_msg_len + TONCOIN_MESSAGE_PREFIX_SIZE + TONCOIN_BLOCKHASH_SIZE;
     CHECK2(preimage1_size <= TONCOIN_MAX_PREIMAGE_SIZE, ERROR_INVALID_ARG);
 
     const mbedtls_md_info_t *md_info =
         mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
 
     memcpy(preimage1, "ton-proof-item-v2/", TONCOIN_MESSAGE_PREFIX_SIZE);
-    memcpy(preimage1+TONCOIN_MESSAGE_PREFIX_SIZE, signed_msg, signed_msg_len);
-    memcpy(preimage1+TONCOIN_MESSAGE_PREFIX_SIZE+signed_msg_len, blockhash, TONCOIN_BLOCKHASH_SIZE);
+    memcpy(preimage1 + TONCOIN_MESSAGE_PREFIX_SIZE, signed_msg, signed_msg_len);
+    memcpy(preimage1 + TONCOIN_MESSAGE_PREFIX_SIZE + signed_msg_len, blockhash,
+           TONCOIN_BLOCKHASH_SIZE);
     preimage2[0] = 0xff;
     preimage2[1] = 0xff;
-    memcpy(preimage2+2, "ton-connect", TONCOIN_MESSAGE_PREFIX2_SIZE);
+    memcpy(preimage2 + 2, "ton-connect", TONCOIN_MESSAGE_PREFIX2_SIZE);
 
-    CHECK(md_string(md_info, preimage1, preimage1_size, preimage2+2+TONCOIN_MESSAGE_PREFIX2_SIZE));
+    CHECK(md_string(md_info, preimage1, preimage1_size,
+                    preimage2 + 2 + TONCOIN_MESSAGE_PREFIX2_SIZE));
     CHECK(md_string(md_info, preimage2, TONCOIN_PREIMAGE2_SIZE, output));
 exit:
     return err;
 }
 
 int validate_signature_toncoin(void *prefilled_data, const uint8_t *sig,
-                              size_t sig_len, const uint8_t *msg,
-                              size_t msg_len, uint8_t *output,
-                              size_t *output_len) {
+                               size_t sig_len, const uint8_t *msg,
+                               size_t msg_len, uint8_t *output,
+                               size_t *output_len) {
     int err = 0;
 
     CHECK2(sig_len == TONCOIN_WRAPPED_SIGNATURE_SIZE, ERROR_INVALID_ARG);
@@ -729,14 +764,17 @@ int validate_signature_toncoin(void *prefilled_data, const uint8_t *sig,
     sig_len = (size_t)sig[0] | ((size_t)sig[1] << 8);
     CHECK2(sig_len <= TONCOIN_UNWRAPPED_SIGNATURE_SIZE, ERROR_INVALID_ARG);
     const uint8_t *signature_ptr = sig + 2;
-    const uint8_t *pub_key_ptr =  signature_ptr + TONCOIN_SIGNATURE_SIZE;
-    const uint8_t *signed_msg_ptr = signature_ptr + TONCOIN_SIGNATURE_SIZE + TONCOIN_PUBKEY_SIZE;
-    size_t signed_msg_len = sig_len - TONCOIN_SIGNATURE_SIZE - TONCOIN_PUBKEY_SIZE;
+    const uint8_t *pub_key_ptr = signature_ptr + TONCOIN_SIGNATURE_SIZE;
+    const uint8_t *signed_msg_ptr =
+        signature_ptr + TONCOIN_SIGNATURE_SIZE + TONCOIN_PUBKEY_SIZE;
+    size_t signed_msg_len =
+        sig_len - TONCOIN_SIGNATURE_SIZE - TONCOIN_PUBKEY_SIZE;
 
     uint8_t message[32];
     CHECK(get_toncoin_message(signed_msg_ptr, signed_msg_len, msg, message));
 
-    int suc = ed25519_verify(signature_ptr, message, sizeof(message), pub_key_ptr);
+    int suc =
+        ed25519_verify(signature_ptr, message, sizeof(message), pub_key_ptr);
     CHECK2(suc == 1, ERROR_WRONG_STATE);
 
     blake2b_state ctx;
@@ -752,7 +790,6 @@ int validate_signature_toncoin(void *prefilled_data, const uint8_t *sig,
 exit:
     return err;
 }
-
 
 int convert_copy(const uint8_t *msg, size_t msg_len, uint8_t *new_msg,
                  size_t new_msg_len) {
@@ -821,31 +858,32 @@ static void split_hex_hash(const uint8_t *source, unsigned char *dest) {
     }
 }
 
-#define MESSAGE_HEX_LEN 64
+#define MAX_MESSAGE_HEX_LEN 64
 int convert_btc_message_variant(const uint8_t *msg, size_t msg_len,
                                 uint8_t *new_msg, size_t new_msg_len,
                                 const char *magic, const uint8_t magic_len) {
     int err = 0;
-    if (msg_len != new_msg_len || msg_len != SHA256_SIZE)
+    if (msg_len > MAX_MESSAGE_HEX_LEN || new_msg_len != SHA256_SIZE)
         return ERROR_INVALID_ARG;
 
-    uint8_t temp[MESSAGE_HEX_LEN];
-    bin_to_hex(msg, temp, 32);
+    uint8_t temp[MAX_MESSAGE_HEX_LEN];
+    bin_to_hex(msg, temp, new_msg_len);
+    const uint8_t message_hex_len = new_msg_len * 2;
 
     // len of magic + magic string + len of message, size is 26 Byte
     uint8_t new_magic[magic_len + 2];
     new_magic[0] = magic_len;  // MESSAGE_MAGIC length
     memcpy(&new_magic[1], magic, magic_len);
-    new_magic[magic_len + 1] = MESSAGE_HEX_LEN;  // message length
+    new_magic[magic_len + 1] = message_hex_len;  // message length
 
     const mbedtls_md_info_t *md_info =
         mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
 
     /* Calculate signature message */
-    uint8_t temp2[magic_len + 2 + MESSAGE_HEX_LEN];
-    uint32_t temp2_size = magic_len + 2 + MESSAGE_HEX_LEN;
+    uint8_t temp2[magic_len + 2 + message_hex_len];
+    uint32_t temp2_size = magic_len + 2 + message_hex_len;
     memcpy(temp2, new_magic, magic_len + 2);
-    memcpy(temp2 + magic_len + 2, temp, MESSAGE_HEX_LEN);
+    memcpy(temp2 + magic_len + 2, temp, message_hex_len);
     err = md_string(md_info, temp2, temp2_size, new_msg);
     if (err != 0) return err;
     err = md_string(md_info, new_msg, SHA256_SIZE, new_msg);
@@ -925,16 +963,25 @@ static int verify(uint8_t *pubkey_hash, const uint8_t *sig, uint32_t sig_len,
     unsigned char alloc_buff[1024];
     mbedtls_memory_buffer_alloc_init(alloc_buff, sizeof(alloc_buff));
 
+    printf("%s (err %d): converting message", __func__, err);
     err = convert(msg, msg_len, new_msg, sizeof(new_msg));
+    printf("%s (err %d): converting message", __func__, err);
     CHECK(err);
+    printf("%s (err %d): converted message", __func__, err);
 
     uint8_t output_pubkey_hash[AUTH160_SIZE];
     size_t output_len = AUTH160_SIZE;
+    printf("%s (err %d): running function", __func__, err);
     err = func(NULL, sig, sig_len, new_msg, sizeof(new_msg), output_pubkey_hash,
                &output_len);
+    printf("%s (err %d): ran function", __func__, err);
     CHECK(err);
 
+    printf("%s (err %d): memcmping", __func__, err);
+    hex_dump("pubkey_hash given", pubkey_hash, AUTH160_SIZE);
     int same = memcmp(pubkey_hash, output_pubkey_hash, AUTH160_SIZE);
+    ckb_printf("%s (same %d): memcmped", __func__, same);
+    hex_dump("pubkey_hash got", output_pubkey_hash, AUTH160_SIZE);
     CHECK2(same == 0, ERROR_MISMATCHED);
 
 exit:
@@ -1125,8 +1172,28 @@ __attribute__((visibility("default"))) int ckb_auth_validate(
                    message_size, validate_signature_eth, convert_tron_message);
         CHECK(err);
     } else if (auth_algorithm_id == AuthAlgorithmIdBitcoin) {
-        err = verify(pubkey_hash, signature, signature_size, message,
-                     message_size, validate_signature_btc, convert_btc_message);
+        printf("%s hello world", __func__);
+        const uint8_t my_signature[] = {
+            0x1b, 0xe2, 0xeb, 0x61, 0xae, 0xd3, 0xe5, 0xd5, 0x0c, 0x0e, 0x04,
+            0x1d, 0xb8, 0x01, 0x2b, 0xc3, 0xe8, 0xba, 0x79, 0xb2, 0xb8, 0x1a,
+            0xa4, 0xd7, 0x61, 0x55, 0x88, 0x0c, 0xcf, 0xac, 0x9d, 0x89, 0x3b,
+            0x61, 0xce, 0x8b, 0x74, 0xf8, 0xad, 0x99, 0xaa, 0x8c, 0xea, 0x3f,
+            0xa2, 0x24, 0xe7, 0x88, 0x0f, 0x50, 0xac, 0x31, 0x73, 0x89, 0x16,
+            0x95, 0x68, 0xa6, 0xf3, 0xe2, 0x1c, 0x17, 0x6e, 0x96, 0x41,
+        };
+        uint32_t my_signature_size = 65;
+        const char *my_message = "abcdefghijk123456789";
+        uint32_t my_message_size = 20;
+        const uint8_t my_pk_hash[] = {
+            0x3d, 0xcf, 0x0a, 0x89, 0xa5, 0x23, 0xff, 0x61, 0x9a, 0x31,
+            0xaf, 0x41, 0x39, 0x54, 0x96, 0x04, 0x14, 0xa7, 0xc2, 0x1e,
+        };
+        err = verify(my_pk_hash, my_signature, my_signature_size, my_message,
+                     my_message_size, validate_signature_btc,
+                     convert_btc_message);
+        // err = verify(pubkey_hash, my_signature, my_signature_size, message,
+        //              message_size, validate_signature_btc,
+        //              convert_btc_message);
         CHECK(err);
     } else if (auth_algorithm_id == AuthAlgorithmIdDogecoin) {
         err =
@@ -1189,5 +1256,3 @@ int main(int argc, char *argv[]) {
 
     return ckb_auth_validate_with_func(argc, argv, *ckb_auth_validate);
 }
-
-

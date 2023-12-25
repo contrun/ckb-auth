@@ -1,12 +1,12 @@
 #ifndef CKB_PRODUCTION_SCRIPTS_CKB_AUTH_H_
 #define CKB_PRODUCTION_SCRIPTS_CKB_AUTH_H_
 
+#include <stddef.h>
+#include <stdint.h>
+
 #include "ckb_consts.h"
 #include "ckb_dlfcn.h"
 #include "ckb_hex.h"
-
-#include <stddef.h>
-#include <stdint.h>
 
 // secp256k1 also defines this macros
 #undef CHECK2
@@ -147,6 +147,7 @@ static size_t g_dl_cache_count = 0;
 
 int get_dl_func_by_code_hash(const uint8_t *code_hash, uint8_t hash_type,
                              ckb_auth_validate_t *out_func) {
+    printf("running %s\n", __func__);
     // Find from cache
     for (size_t i = 0; i < g_dl_cache_count; i++) {
         CkbDLCache *cache = &g_dl_cache[i];
@@ -198,6 +199,7 @@ int get_dl_func_by_code_hash(const uint8_t *code_hash, uint8_t hash_type,
 int ckb_auth(CkbEntryType *entry, CkbAuthType *id, const uint8_t *signature,
              uint32_t signature_size, const uint8_t *message32) {
     int err = 0;
+    printf("running %s\n", __func__);
     if (entry->entry_category == EntryCategoryDynamicLibrary) {
 #ifdef CKB_AUTH_DISABLE_DYNAMIC_LIB
         // Disable DynamicLibrary via macro can save memory
@@ -209,6 +211,7 @@ int ckb_auth(CkbEntryType *entry, CkbAuthType *id, const uint8_t *signature,
         if (err) {
             return err;
         }
+        printf("running %s\n", __func__);
         return func(id->algorithm_id, signature, signature_size, message32,
                     BLAKE2B_BLOCK_SIZE, id->content, AUTH160_SIZE);
 #endif  // CKB_AUTH_DISABLE_DYNAMIC_LIB
@@ -224,22 +227,21 @@ int ckb_auth(CkbEntryType *entry, CkbAuthType *id, const uint8_t *signature,
 
         uint32_t bin2hex_output_len = 0;
         if (ckb_bin2hex(&id->algorithm_id, 1, algorithm_id_str,
-                          sizeof(algorithm_id_str), &bin2hex_output_len,
-                          true)) {
+                        sizeof(algorithm_id_str), &bin2hex_output_len, true)) {
             return CKB_INVALID_DATA;
         }
 
         if (ckb_bin2hex(signature, signature_size, signature_str,
-                          sizeof(signature_str), &bin2hex_output_len, true)) {
+                        sizeof(signature_str), &bin2hex_output_len, true)) {
             return CKB_INVALID_DATA;
         }
-        if (ckb_bin2hex(message32, BLAKE2B_BLOCK_SIZE, message_str, sizeof(message_str),
-                          &bin2hex_output_len, true)) {
+        if (ckb_bin2hex(message32, BLAKE2B_BLOCK_SIZE, message_str,
+                        sizeof(message_str), &bin2hex_output_len, true)) {
             return CKB_INVALID_DATA;
         }
 
         if (ckb_bin2hex(id->content, AUTH160_SIZE, pubkey_hash_str,
-                          sizeof(pubkey_hash_str), &bin2hex_output_len, true)) {
+                        sizeof(pubkey_hash_str), &bin2hex_output_len, true)) {
             return CKB_INVALID_DATA;
         }
 
@@ -275,10 +277,11 @@ int setup_elf() {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Warray-bounds"
 #endif
+    printf("running %s\n", __func__);
     uint64_t *phoff = (uint64_t *)OFFSETOF(Elf64_Ehdr, e_phoff);
     uint16_t *phnum = (uint16_t *)OFFSETOF(Elf64_Ehdr, e_phnum);
     Elf64_Phdr *program_headers = (Elf64_Phdr *)(*phoff);
-    
+
     for (int i = 0; i < *phnum; i++) {
         Elf64_Phdr *program_header = &program_headers[i];
         if (program_header->p_type == PT_DYNAMIC) {
@@ -357,9 +360,11 @@ int setup_elf() {
 #endif
 }
 
-static int ckb_auth_validate_with_func(int argc, char *argv[], ckb_auth_validate_t validate_func) {
+static int ckb_auth_validate_with_func(int argc, char *argv[],
+                                       ckb_auth_validate_t validate_func) {
     int err = 0;
 
+    printf("running %s\n", __func__);
     if (argc != 4) {
         return -1;
     }
@@ -413,7 +418,7 @@ static int ckb_auth_validate_with_func(int argc, char *argv[], ckb_auth_validate
            ERROR_SPAWN_INVALID_PUBKEY);
 
     err = validate_func(algorithm_id, signature, signature_len, message,
-                            message_len, pubkey_hash, pubkey_hash_len);
+                        message_len, pubkey_hash, pubkey_hash_len);
     CHECK(err);
 
 exit:
