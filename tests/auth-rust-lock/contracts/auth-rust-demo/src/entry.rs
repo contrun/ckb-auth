@@ -88,7 +88,7 @@ pub fn main() -> Result<(), Error> {
     };
     #[cfg(feature = "enable-dynamic-library")]
     let secp_data = &mut {
-        let mut len = RECOMMEND_PREFILLED_LEN;
+        let mut len = ckb_auth_get_required_prefilled_data_size(&entry, id.algorithm_id.clone())?;
         let mut data = vec![0; len];
         ckb_auth_prepare(&entry, &mut data, id.algorithm_id.clone(), &mut len)?;
         data

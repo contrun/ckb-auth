@@ -18,8 +18,9 @@ extern crate alloc;
 use ckb_std::default_alloc;
 #[cfg(not(test))]
 ckb_std::entry!(program_entry);
+// Prefilled data requires 1048576 bytes.
 #[cfg(not(test))]
-default_alloc!();
+default_alloc!(4 * 1024, (1024 + 256) * 1024, 64);
 
 /// program entry
 pub fn program_entry() -> i8 {
