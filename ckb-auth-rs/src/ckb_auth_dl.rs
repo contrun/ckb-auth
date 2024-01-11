@@ -1,4 +1,4 @@
-use crate::{CkbAuthError, CkbAuthType, CkbEntryType, AuthAlgorithmIdType};
+use crate::{AuthAlgorithmIdType, CkbAuthError, CkbAuthType, CkbEntryType};
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use ckb_std::{
@@ -167,6 +167,29 @@ pub fn ckb_auth_prepare(
     let code = unsafe { func(algorithm_id.into(), prefilled_data.as_mut_ptr(), len) };
     match code {
         0 => Ok(()),
+        _ => Err(CkbAuthError::RunDLError),
+    }
+}
+
+pub fn ckb_auth_get_required_prefilled_data_size(
+    entry: &CkbEntryType,
+    algorithm_id: AuthAlgorithmIdType,
+) -> Result<usize, CkbAuthError> {
+    let func: Symbol<CkbLoadPrefilledData> = CKBDLLoader::get().get_validate_func(
+        &entry.code_hash,
+        entry.hash_type,
+        EXPORTED_PREFILLED_FUNC_NAME,
+    )?;
+    let len: usize = 0;
+    let code = unsafe {
+        func(
+            algorithm_id.into(),
+            core::ptr::null::<u8>() as *mut u8,
+            &len as *const usize as *mut usize,
+        )
+    };
+    match code {
+        0 => Ok(len),
         _ => Err(CkbAuthError::RunDLError),
     }
 }

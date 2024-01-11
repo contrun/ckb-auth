@@ -15,7 +15,9 @@ mod generate_sighash_all;
 pub use ckb_auth::ckb_auth;
 
 #[cfg(all(feature = "enable-dynamic-library", target_arch = "riscv64"))]
-pub use ckb_auth_dl::{ckb_auth_prepare, RECOMMEND_PREFILLED_LEN};
+pub use ckb_auth_dl::{
+    ckb_auth_get_required_prefilled_data_size, ckb_auth_prepare, RECOMMEND_PREFILLED_LEN,
+};
 
 #[cfg(target_arch = "riscv64")]
 pub use crate::generate_sighash_all::generate_sighash_all;

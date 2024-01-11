@@ -210,6 +210,29 @@ field. The `len` value is suggested to be 1048576 for secp256k1.
 In either mode, a return value of 0 denoting success, other values denote
 failures, and should immediately trigger a script failure.
 
+We export two different (more idiomatic) rust functions for the two modes.
+
+```
+pub fn ckb_auth_get_required_prefilled_data_size(
+    entry: &CkbEntryType,
+    algorithm_id: AuthAlgorithmIdType,
+) -> Result<usize, CkbAuthError>;
+
+pub fn ckb_auth_prepare(
+    entry: &CkbEntryType,
+    prefilled_data: &mut [u8],
+    algorithm_id: AuthAlgorithmIdType,
+    len: &mut usize,
+) -> Result<(), CkbAuthError>;
+```
+where `ckb_auth_get_required_prefilled_data_size` corresponds to the first mode
+to get prefilled data size, while `ckb_auth_prepare` corresponds to the second
+mode to fill in prefilled data.
+
+For the second mode, we can directly use `RECOMMEND_PREFILLED_LEN`, which is a
+c/rust constant for recommended size of prefilled data. Users may allocate this
+much memory and call `ckb_auth_prepare` to fill in the relevant data.
+
 We should also export the following important function from dynamic library:
 ```C
 int ckb_auth_validate(void *prefilled_data, uint8_t auth_algorithm_id, const uint8_t *signature,
@@ -263,7 +286,12 @@ Dependencies name: `ckb-auth-rs`
 
 #### API Description
 ``` rust
-pub fn ckb_auth_prepare(entry: &CkbEntryType, auth_algorithm_id: u8, prefilled_data: &mut[u8]);
+pub fn ckb_auth_prepare(
+    entry: &CkbEntryType,
+    prefilled_data: &mut [u8],
+    algorithm_id: AuthAlgorithmIdType,
+    len: &mut usize,
+) -> Result<(), CkbAuthError>;
 pub fn ckb_auth(
     entry: &CkbEntryType,
     prefilled_data: &[u8],

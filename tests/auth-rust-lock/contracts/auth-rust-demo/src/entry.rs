@@ -9,12 +9,15 @@ use core::result::Result;
 
 use crate::error::Error;
 
+use alloc::vec;
 use ckb_auth_rs::{
     ckb_auth, generate_sighash_all, AuthAlgorithmIdType, CkbAuthError, CkbAuthType, CkbEntryType,
     EntryCategoryType,
 };
 #[cfg(feature = "enable-dynamic-library")]
-use ckb_auth_rs::{ckb_auth_prepare, RECOMMEND_PREFILLED_LEN};
+use ckb_auth_rs::{
+    ckb_auth_get_required_prefilled_data_size, ckb_auth_prepare, RECOMMEND_PREFILLED_LEN,
+};
 use ckb_std::{
     ckb_constants::Source,
     ckb_types::{bytes::Bytes, core::ScriptHashType, prelude::*},
@@ -65,7 +68,7 @@ pub fn main() -> Result<(), Error> {
 
     let id = CkbAuthType {
         algorithm_id: AuthAlgorithmIdType::try_from(auth_id).map_err(|f| CkbAuthError::from(f))?,
-        pubkey_hash: pubkey_hash,
+        pubkey_hash,
     };
 
     match id.algorithm_id {
@@ -81,7 +84,7 @@ pub fn main() -> Result<(), Error> {
 
     let entry = CkbEntryType {
         code_hash,
-        hash_type,
+        hash_type: hash_type.into(),
         entry_category: EntryCategoryType::try_from(entry_type)
             .map_err(|f| CkbAuthError::from(f))
             .unwrap(),
@@ -101,8 +104,18 @@ pub fn main() -> Result<(), Error> {
     let secp_data = &mut [0u8; 1];
 
     ckb_auth(&entry, secp_data, &id, &signature, &message)?;
+
     // ckb_auth can be invoked multiple times for different signatures. Here we
     // use the same one to demo the usage.
+    // Here we also try to reserve buffer with alloc.
+    #[cfg(feature = "enable-dynamic-library")]
+    let secp_data = &mut {
+        let mut len = ckb_auth_get_required_prefilled_data_size(&entry, id.algorithm_id.clone())?;
+        let mut data = vec![0; len];
+        ckb_auth_prepare(&entry, &mut data, id.algorithm_id.clone(), &mut len)?;
+        data
+    };
+
     ckb_auth(&entry, secp_data, &id, &signature, &message)?;
 
     Ok(())
