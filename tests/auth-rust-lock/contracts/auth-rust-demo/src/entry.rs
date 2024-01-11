@@ -24,9 +24,6 @@ use ckb_std::{
     high_level::{load_script, load_witness_args},
 };
 
-#[cfg(feature = "enable-dynamic-library")]
-static mut SECP_DATA: [u8; RECOMMEND_PREFILLED_LEN] = [0u8; RECOMMEND_PREFILLED_LEN];
-
 pub fn main() -> Result<(), Error> {
     let mut pubkey_hash = [0u8; 20];
     let auth_id: u8;
@@ -90,15 +87,11 @@ pub fn main() -> Result<(), Error> {
             .unwrap(),
     };
     #[cfg(feature = "enable-dynamic-library")]
-    let secp_data = {
-        let mut len: usize = RECOMMEND_PREFILLED_LEN;
-        ckb_auth_prepare(
-            &entry,
-            unsafe { &mut SECP_DATA },
-            id.algorithm_id.clone(),
-            &mut len,
-        )?;
-        unsafe { &mut SECP_DATA }
+    let secp_data = &mut {
+        let mut len = ckb_auth_get_required_prefilled_data_size(&entry, id.algorithm_id.clone())?;
+        let mut data = vec![0; len];
+        ckb_auth_prepare(&entry, &mut data, id.algorithm_id.clone(), &mut len)?;
+        data
     };
     #[cfg(not(feature = "enable-dynamic-library"))]
     let secp_data = &mut [0u8; 1];
@@ -106,15 +99,6 @@ pub fn main() -> Result<(), Error> {
     ckb_auth(&entry, secp_data, &id, &signature, &message)?;
     // ckb_auth can be invoked multiple times for different signatures. Here we
     // use the same one to demo the usage.
-
-    // // Here we also try to reserve buffer with alloc.
-    // #[cfg(feature = "enable-dynamic-library")]
-    // let secp_data = &mut {
-    //     let mut len = ckb_auth_get_required_prefilled_data_size(&entry, id.algorithm_id.clone())?;
-    //     let mut data = vec![0; len];
-    //     ckb_auth_prepare(&entry, &mut data, id.algorithm_id.clone(), &mut len)?;
-    //     data
-    // };
 
     ckb_auth(&entry, secp_data, &id, &signature, &message)?;
 
