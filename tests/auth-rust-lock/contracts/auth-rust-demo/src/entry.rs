@@ -104,17 +104,17 @@ pub fn main() -> Result<(), Error> {
     let secp_data = &mut [0u8; 1];
 
     ckb_auth(&entry, secp_data, &id, &signature, &message)?;
-
     // ckb_auth can be invoked multiple times for different signatures. Here we
     // use the same one to demo the usage.
-    // Here we also try to reserve buffer with alloc.
-    #[cfg(feature = "enable-dynamic-library")]
-    let secp_data = &mut {
-        let mut len = ckb_auth_get_required_prefilled_data_size(&entry, id.algorithm_id.clone())?;
-        let mut data = vec![0; len];
-        ckb_auth_prepare(&entry, &mut data, id.algorithm_id.clone(), &mut len)?;
-        data
-    };
+
+    // // Here we also try to reserve buffer with alloc.
+    // #[cfg(feature = "enable-dynamic-library")]
+    // let secp_data = &mut {
+    //     let mut len = ckb_auth_get_required_prefilled_data_size(&entry, id.algorithm_id.clone())?;
+    //     let mut data = vec![0; len];
+    //     ckb_auth_prepare(&entry, &mut data, id.algorithm_id.clone(), &mut len)?;
+    //     data
+    // };
 
     ckb_auth(&entry, secp_data, &id, &signature, &message)?;
 
