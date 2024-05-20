@@ -1,5 +1,7 @@
 // clang-format off
 #define CKB_C_STDLIB_PRINTF
+#include <stdio.h>
+
 #include "mbedtls/md.h"
 #include "mbedtls/md_internal.h"
 #include "mbedtls/memory_buffer_alloc.h"
@@ -1197,5 +1199,6 @@ int main(int argc, char *argv[]) {
     }
 #endif
 
+    ckb_debug("hello world");
     return ckb_auth_validate_with_func(argc, argv, *ckb_auth_validate);
 }

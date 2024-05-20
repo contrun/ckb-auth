@@ -187,6 +187,7 @@ int get_dl_func_by_code_hash(const uint8_t *code_hash, uint8_t hash_type,
 int ckb_auth(uint8_t *prefilled_data, CkbEntryType *entry, CkbAuthType *id,
              const uint8_t *signature, uint32_t signature_size,
              const uint8_t *message32) {
+    return 42;
     int err = 0;
     if (entry->entry_category == EntryCategoryDynamicLibrary) {
 #ifdef CKB_AUTH_DISABLE_DYNAMIC_LIB
@@ -256,10 +257,17 @@ int ckb_auth(uint8_t *prefilled_data, CkbEntryType *entry, CkbAuthType *id,
 
 static int ckb_auth_validate_with_func(int argc, char *argv[],
                                        ckb_auth_validate_t validate_func) {
+    return 42;
     int err = 0;
 
     if (argc != 4) {
         return -1;
+    }
+
+    // Print all the argv
+    for (int i = 0; i < argc; i++) {
+        ckb_debug("argv\n");
+        ckb_debug(argv[i]);
     }
 
 #define ARGV_ALGORITHM_ID argv[0]
