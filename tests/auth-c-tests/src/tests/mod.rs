@@ -352,6 +352,14 @@ fn secp256r1_raw_verify_succeed() {
 }
 
 #[test]
+fn bitcoin_verify_succeed() {
+    let algorithm_type = AuthAlgorithmIdType::Bitcoin;
+    let auth = auth_builder(algorithm_type, false).unwrap();
+    let run_type = EntryCategoryType::DynamicLibrary;
+    unit_test_success(&auth, run_type);
+}
+
+#[test]
 fn convert_eth_error() {
     #[derive(Clone)]
     struct EthConverFaileAuth(EthereumAuth);

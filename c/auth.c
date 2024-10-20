@@ -1,3 +1,5 @@
+#include "dump.c"
+
 // clang-format off
 #include "mbedtls/md.h"
 #include "mbedtls/md_internal.h"
@@ -172,15 +174,18 @@ static int _recover_secp256k1_pubkey_btc(const uint8_t *sig, size_t sig_len,
     int ret = 0;
 
     if (sig_len != SECP256K1_SIGNATURE_SIZE) {
+        return sig_len;
         return ERROR_INVALID_ARG;
     }
     if (msg_len != SECP256K1_MESSAGE_SIZE) {
+        return msg_len;
         return ERROR_INVALID_ARG;
     }
 
     BTCVType v_type;
     int recid = get_btc_recid(sig[0], &v_type);
     if (recid == -1) {
+        return recid;
         return ERROR_INVALID_ARG;
     }
 
@@ -854,31 +859,32 @@ static void split_hex_hash(const uint8_t *source, unsigned char *dest) {
     }
 }
 
-#define MESSAGE_HEX_LEN 64
+#define MAX_MESSAGE_HEX_LEN 64
 int convert_btc_message_variant(const uint8_t *msg, size_t msg_len,
                                 uint8_t *new_msg, size_t new_msg_len,
                                 const char *magic, const uint8_t magic_len) {
     int err = 0;
-    if (msg_len != new_msg_len || msg_len != SHA256_SIZE)
+    if (msg_len > MAX_MESSAGE_HEX_LEN || new_msg_len != SHA256_SIZE)
         return ERROR_INVALID_ARG;
 
-    uint8_t temp[MESSAGE_HEX_LEN];
-    bin_to_hex(msg, temp, 32);
+    uint8_t temp[MAX_MESSAGE_HEX_LEN];
+    bin_to_hex(msg, temp, new_msg_len);
+    const uint8_t message_hex_len = new_msg_len * 2;
 
     // len of magic + magic string + len of message, size is 26 Byte
     uint8_t new_magic[magic_len + 2];
     new_magic[0] = magic_len;  // MESSAGE_MAGIC length
     memcpy(&new_magic[1], magic, magic_len);
-    new_magic[magic_len + 1] = MESSAGE_HEX_LEN;  // message length
+    new_magic[magic_len + 1] = message_hex_len;  // message length
 
     const mbedtls_md_info_t *md_info =
         mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
 
     /* Calculate signature message */
-    uint8_t temp2[magic_len + 2 + MESSAGE_HEX_LEN];
-    uint32_t temp2_size = magic_len + 2 + MESSAGE_HEX_LEN;
+    uint8_t temp2[magic_len + 2 + message_hex_len];
+    uint32_t temp2_size = magic_len + 2 + message_hex_len;
     memcpy(temp2, new_magic, magic_len + 2);
-    memcpy(temp2 + magic_len + 2, temp, MESSAGE_HEX_LEN);
+    memcpy(temp2 + magic_len + 2, temp, message_hex_len);
     err = md_string(md_info, temp2, temp2_size, new_msg);
     if (err != 0) return err;
     err = md_string(md_info, new_msg, SHA256_SIZE, new_msg);
@@ -958,16 +964,25 @@ static int verify(uint8_t *pubkey_hash, const uint8_t *sig, uint32_t sig_len,
     unsigned char alloc_buff[1024];
     mbedtls_memory_buffer_alloc_init(alloc_buff, sizeof(alloc_buff));
 
+    printf("%s (err %d): converting message", __func__, err);
     err = convert(msg, msg_len, new_msg, sizeof(new_msg));
+    printf("%s (err %d): converting message", __func__, err);
     CHECK(err);
+    printf("%s (err %d): converted message", __func__, err);
 
     uint8_t output_pubkey_hash[AUTH160_SIZE];
     size_t output_len = AUTH160_SIZE;
+    printf("%s (err %d): running function", __func__, err);
     err = func(NULL, sig, sig_len, new_msg, sizeof(new_msg), output_pubkey_hash,
                &output_len);
+    printf("%s (err %d): ran function", __func__, err);
     CHECK(err);
 
+    printf("%s (err %d): memcmping", __func__, err);
+    hex_dump("pubkey_hash given", pubkey_hash, AUTH160_SIZE);
     int same = memcmp(pubkey_hash, output_pubkey_hash, AUTH160_SIZE);
+    ckb_printf("%s (same %d): memcmped", __func__, same);
+    hex_dump("pubkey_hash got", output_pubkey_hash, AUTH160_SIZE);
     CHECK2(same == 0, ERROR_MISMATCHED);
 
 exit:
@@ -1158,8 +1173,28 @@ __attribute__((visibility("default"))) int ckb_auth_validate(
                    message_size, validate_signature_eth, convert_tron_message);
         CHECK(err);
     } else if (auth_algorithm_id == AuthAlgorithmIdBitcoin) {
-        err = verify(pubkey_hash, signature, signature_size, message,
-                     message_size, validate_signature_btc, convert_btc_message);
+        printf("%s hello world", __func__);
+        const uint8_t my_signature[] = {
+            0x1b, 0xe2, 0xeb, 0x61, 0xae, 0xd3, 0xe5, 0xd5, 0x0c, 0x0e, 0x04,
+            0x1d, 0xb8, 0x01, 0x2b, 0xc3, 0xe8, 0xba, 0x79, 0xb2, 0xb8, 0x1a,
+            0xa4, 0xd7, 0x61, 0x55, 0x88, 0x0c, 0xcf, 0xac, 0x9d, 0x89, 0x3b,
+            0x61, 0xce, 0x8b, 0x74, 0xf8, 0xad, 0x99, 0xaa, 0x8c, 0xea, 0x3f,
+            0xa2, 0x24, 0xe7, 0x88, 0x0f, 0x50, 0xac, 0x31, 0x73, 0x89, 0x16,
+            0x95, 0x68, 0xa6, 0xf3, 0xe2, 0x1c, 0x17, 0x6e, 0x96, 0x41,
+        };
+        uint32_t my_signature_size = 65;
+        const char *my_message = "abcdefghijk123456789";
+        uint32_t my_message_size = 20;
+        const uint8_t my_pk_hash[] = {
+            0x3d, 0xcf, 0x0a, 0x89, 0xa5, 0x23, 0xff, 0x61, 0x9a, 0x31,
+            0xaf, 0x41, 0x39, 0x54, 0x96, 0x04, 0x14, 0xa7, 0xc2, 0x1e,
+        };
+        err = verify(my_pk_hash, my_signature, my_signature_size, my_message,
+                     my_message_size, validate_signature_btc,
+                     convert_btc_message);
+        // err = verify(pubkey_hash, my_signature, my_signature_size, message,
+        //              message_size, validate_signature_btc,
+        //              convert_btc_message);
         CHECK(err);
     } else if (auth_algorithm_id == AuthAlgorithmIdDogecoin) {
         err =

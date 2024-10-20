@@ -158,6 +158,7 @@ int main() {
 
   unsigned char script[SCRIPT_SIZE];
   len = SCRIPT_SIZE;
+  printf("running %s\n", __func__);
   ret = ckb_load_script(script, &len, 0);
   if (ret != CKB_SUCCESS) {
     return CKB_INVALID_DATA;
